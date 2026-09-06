@@ -8,6 +8,11 @@
 class DirectIO64Backend final : public KernelRwCallBackend
 {
 public:
+	DirectIO64Backend( )
+	{
+		m_CallGate = KernelCallGate::TableSwap;
+	}
+
 	std::string Name( ) const override;
 
 protected:

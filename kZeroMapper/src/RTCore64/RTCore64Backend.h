@@ -8,6 +8,11 @@
 class RTCore64Backend final : public KernelRwCallBackend
 {
 public:
+	RTCore64Backend( )
+	{
+		m_CallGate = KernelCallGate::TableSwap;
+	}
+
 	std::string Name( ) const override;
 	NTSTATUS Load( ) override;
 
@@ -16,8 +21,6 @@ protected:
 	NTSTATUS UnloadDevice( ) override;
 	bool ReadMemory( uint64_t address, void* buffer, size_t size ) override;
 	bool WriteMemory( uint64_t address, const void* buffer, size_t size ) override;
-	bool PrepareKernelCall( uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize ) override;
-	bool RestoreKernelCall( uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize ) override;
 
 private:
 	struct MemoryOperation
@@ -33,10 +36,6 @@ private:
 
 	bool ReadPrimitive( uint64_t address, uint32_t size, uint32_t* value );
 	bool WritePrimitive( uint64_t address, uint32_t size, uint32_t value );
-	uint64_t ResolveNtUserSetGestureConfigRef( );
-	uint64_t ResolveNtUserSetGestureConfigRefFromSessionState( uint64_t win32k, uint64_t ntUserSetGestureConfigFull );
-
-	uint64_t m_NtUserSetGestureConfigRef = 0;
 };
 
 

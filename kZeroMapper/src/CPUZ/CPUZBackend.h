@@ -8,6 +8,11 @@
 class CPUZBackend final : public KernelRwCallBackend
 {
 public:
+	CPUZBackend( )
+	{
+		m_CallGate = KernelCallGate::NtQueryAtom;
+	}
+
 	std::string Name( ) const override;
 
 protected:

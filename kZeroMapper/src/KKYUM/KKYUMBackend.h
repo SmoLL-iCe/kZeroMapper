@@ -8,6 +8,11 @@
 class KKYUMBackend final : public KernelRwCallBackend
 {
 public:
+	KKYUMBackend( )
+	{
+		m_CallGate = KernelCallGate::TableSwap;
+	}
+
 	std::string Name( ) const override;
 
 protected:

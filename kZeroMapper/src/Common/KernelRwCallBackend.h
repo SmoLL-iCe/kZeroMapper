@@ -2,6 +2,12 @@
 #include "MapperBackend.h"
 #include <type_traits>
 
+enum class KernelCallGate
+{
+	TableSwap,       // NtUserSetGestureConfig (vtable / dispatch table pointer swap, no RX modification required)
+	NtQueryAtom      // NtQueryInformationAtom (jump stub patch in ntoskrnl, requires RX modification)
+};
+
 class KernelRwCallBackend : public IMapperBackend
 {
 public:
@@ -10,6 +16,22 @@ public:
 	bool Clean( ) override;
 	NTSTATUS Execute( uint8_t* shellCode, uint32_t codeSize ) override;
 	void SetAllocationMode( KernelAllocationMode mode );
+
+	void SetCallGate( KernelCallGate gate );
+	KernelCallGate GetCallGate( ) const;
+
+	uint64_t ResolveNtUserSetGestureConfigRef( );
+	uint64_t ResolveNtUserSetGestureConfigRefFromSessionState( uint64_t win32k, uint64_t ntUserSetGestureConfigFull );
+	uint64_t GetNtUserSetGestureConfigRef( ) const { return m_NtUserSetGestureConfigRef; }
+
+	bool PrepareKernelCallGestureConfig( uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize );
+	bool RestoreKernelCallGestureConfig( uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize );
+
+	bool PrepareKernelCallAtom( uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize );
+	bool RestoreKernelCallAtom( uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize );
+
+	virtual bool PrepareKernelCall( uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize );
+	virtual bool RestoreKernelCall( uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize );
 
 	friend class KernelClean;
 	friend class KernelCleanImpl;
@@ -20,8 +42,6 @@ protected:
 	virtual bool WriteMemory( uint64_t address, const void* buffer, size_t size ) = 0;
 
 	virtual bool WriteToReadOnlyMemory( uint64_t address, const void* buffer, size_t size );
-	virtual bool PrepareKernelCall( uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize );
-	virtual bool RestoreKernelCall( uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize );
 
 	uint64_t GetKernelModuleExport( uint64_t kernelModuleBase, const char* functionName );
 	uint64_t AllocatePool( POOL_TYPE poolType, uint64_t size );
@@ -84,8 +104,49 @@ protected:
 
 	HANDLE m_Device = INVALID_HANDLE_VALUE;
 	uint64_t m_Ntoskrnl = 0;
+	uint64_t m_NtUserSetGestureConfigRef = 0;
+	KernelCallGate m_CallGate = KernelCallGate::TableSwap;
 	KernelAllocationMode m_AllocationMode = KernelAllocationMode::Pool;
 	uint64_t m_MmAllocateIndependentPagesEx = 0;
 	uint64_t m_MmFreeIndependentPages = 0;
 	uint64_t m_MmSetPageProtection = 0;
 };
+
+namespace kZeroMapper
+{
+	inline uint64_t ResolveNtUserSetGestureConfigRef( KernelRwCallBackend& backend )
+	{
+		return backend.ResolveNtUserSetGestureConfigRef( );
+	}
+
+	inline bool PrepareKernelCallGestureConfig( KernelRwCallBackend& backend, uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize )
+	{
+		return backend.PrepareKernelCallGestureConfig( kernelFunctionAddress, userFunction, restoreAddress, originalBytes, originalSize );
+	}
+
+	inline bool RestoreKernelCallGestureConfig( KernelRwCallBackend& backend, uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize )
+	{
+		return backend.RestoreKernelCallGestureConfig( restoreAddress, originalBytes, originalSize );
+	}
+
+	inline bool PrepareKernelCallAtom( KernelRwCallBackend& backend, uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize )
+	{
+		return backend.PrepareKernelCallAtom( kernelFunctionAddress, userFunction, restoreAddress, originalBytes, originalSize );
+	}
+
+	inline bool RestoreKernelCallAtom( KernelRwCallBackend& backend, uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize )
+	{
+		return backend.RestoreKernelCallAtom( restoreAddress, originalBytes, originalSize );
+	}
+
+	inline bool PrepareKernelCall( KernelRwCallBackend& backend, uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize )
+	{
+		return backend.PrepareKernelCall( kernelFunctionAddress, userFunction, restoreAddress, originalBytes, originalSize );
+	}
+
+	inline bool RestoreKernelCall( KernelRwCallBackend& backend, uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize )
+	{
+		return backend.RestoreKernelCall( restoreAddress, originalBytes, originalSize );
+	}
+}
+

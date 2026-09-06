@@ -8,6 +8,11 @@
 class KDMapperBackend final : public KernelRwCallBackend
 {
 public:
+	KDMapperBackend( )
+	{
+		m_CallGate = KernelCallGate::NtQueryAtom;
+	}
+
 	std::string Name( ) const override;
 
 protected:
