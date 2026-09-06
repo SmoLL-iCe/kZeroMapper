@@ -86,11 +86,18 @@ int main(int argc, char* argv[])
     std::cout << "[+] Read " << driverBuffer.size() << " bytes from driver file." << std::endl;
     std::cout << "[*] Mapping driver using kZeroMapper..." << std::endl;
 
-    const NTSTATUS status = kZeroMapper::MapDriver(
-        driverBuffer.data(),
-        driverBuffer.size(),
-        false // bClean
-    );
+    const NTSTATUS status = kZeroMapper::MapDriver( 
+        kZeroMapper::MapperProvider::RTCore64, 
+        driverBuffer.data( ),
+        driverBuffer.size( ), 
+        kZeroMapper::KernelAllocationMode::Pool, 
+        false );
+
+    //const NTSTATUS status = kZeroMapper::MapDriver(
+    //    driverBuffer.data(),
+    //    driverBuffer.size(),
+    //    false // bClean
+    //);
 
     std::cout << "-------------------------------------------------" << std::endl;
     if (status == 0) // STATUS_SUCCESS

