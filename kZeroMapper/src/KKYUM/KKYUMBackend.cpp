@@ -1,3 +1,7 @@
+#include <kZeroMapper/kZeroMapperConfig.h>
+
+#if defined(KZEROMAPPER_ENABLE_KKYUM)
+
 #include "KKYUMBackend.h"
 #include "../Common/VulnerableDriverLoader.h"
 #include "KKYUM_sys.h"
@@ -11,7 +15,7 @@ namespace
 
 std::string KKYUMBackend::Name( ) const
 {
-	return "KKYUM";
+	return pstra( "KKYUM" );
 }
 
 NTSTATUS KKYUMBackend::LoadDevice( )
@@ -67,3 +71,8 @@ bool KKYUMBackend::CopyKernelMemory( DWORD ioctl, uint64_t address, void* buffer
 
 	return true;
 }
+
+
+
+
+#endif // KZEROMAPPER_ENABLE_KKYUM

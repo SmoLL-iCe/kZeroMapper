@@ -1,3 +1,7 @@
+#include <kZeroMapper/kZeroMapperConfig.h>
+
+#if defined(KZEROMAPPER_ENABLE_RTCORE64)
+
 #include "RTCore64Backend.h"
 #include "../Common/VulnerableDriverLoader.h"
 #include "RTCore64_sys.h"
@@ -394,3 +398,8 @@ uint64_t RTCore64Backend::ResolveNtUserSetGestureConfigRefFromSessionState( uint
 
 	return 0;
 }
+
+
+
+
+#endif // KZEROMAPPER_ENABLE_RTCORE64

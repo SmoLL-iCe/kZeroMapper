@@ -1,4 +1,8 @@
-﻿#include "CPUZBackend.h"
+#include <kZeroMapper/kZeroMapperConfig.h>
+
+#if defined(KZEROMAPPER_ENABLE_CPUZ)
+
+#include "CPUZBackend.h"
 #include "../Common/VulnerableDriverLoader.h"
 #include "cpuz_sys.h"
 #include <algorithm>
@@ -18,7 +22,7 @@ namespace
 
 std::string CPUZBackend::Name( ) const
 {
-	return "CPUZ";
+	return pstra( "CPUZ" );
 }
 
 NTSTATUS CPUZBackend::LoadDevice( )
@@ -311,3 +315,8 @@ bool CPUZBackend::ReadVirtualMemory( uint64_t address, void* buffer, size_t size
 
 	return true;
 }
+
+
+
+
+#endif // KZEROMAPPER_ENABLE_CPUZ

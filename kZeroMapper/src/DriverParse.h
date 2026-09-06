@@ -21,7 +21,7 @@ private:
 
 	std::vector<uint8_t>	m_ImageMapped {};
 
-	PIMAGE_DOS_HEADER		  m_pImgDosHeader		= nullptr;
+	PIMAGE_DOS_HEADER		m_pImgDosHeader		= nullptr;
 
 	PIMAGE_NT_HEADERS64		m_pImgNtHeaders		= nullptr;
 

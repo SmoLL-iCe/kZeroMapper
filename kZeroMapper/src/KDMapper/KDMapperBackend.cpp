@@ -1,4 +1,8 @@
-﻿#include "KDMapperBackend.h"
+#include <kZeroMapper/kZeroMapperConfig.h>
+
+#if defined(KZEROMAPPER_ENABLE_KDMAPPER)
+
+#include "KDMapperBackend.h"
 #include "../Common/VulnerableDriverLoader.h"
 #include <kZeroMapper/MapperStatus.h>
 #include "intel_sys.h"
@@ -176,3 +180,8 @@ bool KDMapperBackend::UnmapIoSpace( uint64_t address, uint32_t size )
 
 	return CallDriver( &request, sizeof( request ) );
 }
+
+
+
+
+#endif // KZEROMAPPER_ENABLE_KDMAPPER

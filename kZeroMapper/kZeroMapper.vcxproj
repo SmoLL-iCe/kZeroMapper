@@ -75,6 +75,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="include\kZeroMapper\kZeroMapper.h" />
+    <ClInclude Include="include\kZeroMapper\kZeroMapperConfig.h" />
+    <ClInclude Include="include\kZeroMapper\kZeroConfig.h" />
     <ClInclude Include="include\kZeroMapper\MapperStatus.h" />
     <ClInclude Include="include\kZeroMapper\MapperTypes.h" />
     <ClInclude Include="include\kZeroMapper\tuturla.h" />

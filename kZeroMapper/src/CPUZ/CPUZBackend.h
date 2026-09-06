@@ -1,4 +1,8 @@
 #pragma once
+#include <kZeroMapper/kZeroMapperConfig.h>
+
+#if defined(KZEROMAPPER_ENABLE_CPUZ)
+
 #include "../Common/KernelRwCallBackend.h"
 
 class CPUZBackend final : public KernelRwCallBackend
@@ -49,3 +53,8 @@ private:
 
 	uint64_t m_Pml4 = 0;
 };
+
+
+
+
+#endif // KZEROMAPPER_ENABLE_CPUZ

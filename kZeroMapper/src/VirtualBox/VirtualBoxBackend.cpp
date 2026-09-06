@@ -1,4 +1,8 @@
-﻿#include "VirtualBoxBackend.h"
+#include <kZeroMapper/kZeroMapperConfig.h>
+
+#if defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
+
+#include "VirtualBoxBackend.h"
 #include "../Common/VulnerableDriverLoader.h"
 #include "vbox.h"
 #include "vbox_sys.h"
@@ -200,3 +204,8 @@ NTSTATUS VirtualBoxBackend::StopVulnerableDriver( )
 
 	return UnloadMapperDriver( );
 }
+
+
+
+
+#endif // KZEROMAPPER_ENABLE_VIRTUALBOX

@@ -1,4 +1,8 @@
 #pragma once
+#include <kZeroMapper/kZeroMapperConfig.h>
+
+#if defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
+
 #include "../Common/MapperBackend.h"
 
 class VirtualBoxBackend final : public IMapperBackend
@@ -19,3 +23,8 @@ private:
 	HANDLE m_Device = INVALID_HANDLE_VALUE;
 	NTSTATUS m_Status2 = 0;
 };
+
+
+
+
+#endif // KZEROMAPPER_ENABLE_VIRTUALBOX

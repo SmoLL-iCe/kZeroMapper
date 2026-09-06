@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include "kZeroMapperConfig.h"
 #include "MapperTypes.h"
 #include "MapperStatus.h"
 
@@ -30,6 +31,7 @@ namespace kZeroMapper {
 
 	NTSTATUS MapDriver(void* pDrvData = nullptr, size_t szDataSize = 0, bool bClean = false);
 	NTSTATUS MapDriver(MapperProvider provider, void* pDrvData = nullptr, size_t szDataSize = 0, KernelAllocationMode allocationMode = KernelAllocationMode::Pool, bool bClean = false);
+	bool IsProviderSupported(MapperProvider provider);
 	NTSTATUS GetLastStatus();
 	NTSTATUS GetStatus2();
 	using ::StopDriverService;

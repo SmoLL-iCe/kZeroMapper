@@ -1,4 +1,8 @@
 #pragma once
+#include <kZeroMapper/kZeroMapperConfig.h>
+
+#if defined(KZEROMAPPER_ENABLE_KDMAPPER)
+
 #include "../Common/KernelRwCallBackend.h"
 
 class KDMapperBackend final : public KernelRwCallBackend
@@ -57,3 +61,8 @@ private:
 	uint64_t MapIoSpace( uint64_t physicalAddress, uint32_t size );
 	bool UnmapIoSpace( uint64_t address, uint32_t size );
 };
+
+
+
+
+#endif // KZEROMAPPER_ENABLE_KDMAPPER

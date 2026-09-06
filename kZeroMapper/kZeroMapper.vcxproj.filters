@@ -36,6 +36,12 @@
     <ClInclude Include="include\kZeroMapper\kZeroMapper.h">
       <Filter>include\kZeroMapper</Filter>
     </ClInclude>
+    <ClInclude Include="include\kZeroMapper\kZeroMapperConfig.h">
+      <Filter>include\kZeroMapper</Filter>
+    </ClInclude>
+    <ClInclude Include="include\kZeroMapper\kZeroConfig.h">
+      <Filter>include\kZeroMapper</Filter>
+    </ClInclude>
     <ClInclude Include="include\kZeroMapper\MapperStatus.h">
       <Filter>include\kZeroMapper</Filter>
     </ClInclude>

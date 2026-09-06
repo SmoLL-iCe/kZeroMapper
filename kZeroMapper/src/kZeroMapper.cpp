@@ -1,12 +1,31 @@
-﻿#include <kZeroMapper/kZeroMapper.h>
+#include <kZeroMapper/kZeroMapper.h>
+#include <kZeroMapper/kZeroMapperConfig.h>
 #include "Common/MapperExecutor.h"
 #include "Common/MapperLogging.h"
+
+#if defined(KZEROMAPPER_ENABLE_CPUZ)
 #include "CPUZ/CPUZBackend.h"
+#endif
+
+#if defined(KZEROMAPPER_ENABLE_DIRECTIO64)
 #include "DirectIO64/DirectIO64Backend.h"
+#endif
+
+#if defined(KZEROMAPPER_ENABLE_KDMAPPER)
 #include "KDMapper/KDMapperBackend.h"
+#endif
+
+#if defined(KZEROMAPPER_ENABLE_KKYUM)
 #include "KKYUM/KKYUMBackend.h"
+#endif
+
+#if defined(KZEROMAPPER_ENABLE_RTCORE64)
 #include "RTCore64/RTCore64Backend.h"
+#endif
+
+#if defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
 #include "VirtualBox/VirtualBoxBackend.h"
+#endif
 
 namespace
 {
@@ -22,6 +41,7 @@ namespace
 		return RunMapperBackend( backend, pDrvData, szDataSize, bClean );
 	}
 
+#if defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
 	NTSTATUS RunVirtualBoxBackend( void* pDrvData, size_t szDataSize, bool bClean )
 	{
 		VirtualBoxBackend backend;
@@ -29,6 +49,7 @@ namespace
 		g_Status2 = backend.Status2( );
 		return result;
 	}
+#endif
 }
 
 namespace kZeroMapper
@@ -66,12 +87,89 @@ namespace kZeroMapper
 		return g_Status2;
 	}
 
+	bool IsProviderSupported( MapperProvider provider )
+	{
+		switch ( provider )
+		{
+		case MapperProvider::CPUZ:
+#if defined(KZEROMAPPER_ENABLE_CPUZ)
+			return true;
+#else
+			return false;
+#endif
+		case MapperProvider::DirectIO64:
+#if defined(KZEROMAPPER_ENABLE_DIRECTIO64)
+			return true;
+#else
+			return false;
+#endif
+		case MapperProvider::KDMapper:
+#if defined(KZEROMAPPER_ENABLE_KDMAPPER)
+			return true;
+#else
+			return false;
+#endif
+		case MapperProvider::KKYUM:
+#if defined(KZEROMAPPER_ENABLE_KKYUM)
+			return true;
+#else
+			return false;
+#endif
+		case MapperProvider::RTCore64:
+#if defined(KZEROMAPPER_ENABLE_RTCORE64)
+			return true;
+#else
+			return false;
+#endif
+		case MapperProvider::VirtualBox:
+#if defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
+			return true;
+#else
+			return false;
+#endif
+		default:
+			return false;
+		}
+	}
+
 	NTSTATUS MapDriver( void* pDrvData, size_t szDataSize, bool bClean )
 	{
 		if ( GetBuildNumber( ) >= 26100 )
+		{
+#if defined(KZEROMAPPER_ENABLE_RTCORE64)
 			return MapDriver( MapperProvider::RTCore64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_CPUZ)
+			return MapDriver( MapperProvider::CPUZ, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_DIRECTIO64)
+			return MapDriver( MapperProvider::DirectIO64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_KKYUM)
+			return MapDriver( MapperProvider::KKYUM, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
+			return MapDriver( MapperProvider::VirtualBox, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_KDMAPPER)
+			return MapDriver( MapperProvider::KDMapper, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#else
+			InternalLog( "[-] [kZeroMapper] No kernel backend available at compile time." );
+			return static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
+		}
 
+#if defined(KZEROMAPPER_ENABLE_KDMAPPER)
 		return MapDriver( MapperProvider::KDMapper, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_RTCORE64)
+		return MapDriver( MapperProvider::RTCore64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_CPUZ)
+		return MapDriver( MapperProvider::CPUZ, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_DIRECTIO64)
+		return MapDriver( MapperProvider::DirectIO64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_KKYUM)
+		return MapDriver( MapperProvider::KKYUM, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
+		return MapDriver( MapperProvider::VirtualBox, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#else
+		InternalLog( "[-] [kZeroMapper] No kernel backend available at compile time." );
+		return static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
 	}
 
 	NTSTATUS MapDriver( MapperProvider provider, void* pDrvData, size_t szDataSize, KernelAllocationMode allocationMode, bool bClean )
@@ -89,19 +187,64 @@ namespace kZeroMapper
 		NTSTATUS result = STATUS_UNSUCCESSFUL;
 
 		if ( provider == MapperProvider::RTCore64 )
+		{
+#if defined(KZEROMAPPER_ENABLE_RTCORE64)
 			result = RunKernelRwBackend<RTCore64Backend>( pDrvData, szDataSize, allocationMode, bClean );
-		else if ( provider == MapperProvider::DirectIO64 )
-			result = RunKernelRwBackend<DirectIO64Backend>( pDrvData, szDataSize, allocationMode, bClean );
-		else if ( provider == MapperProvider::CPUZ )
-			result = RunKernelRwBackend<CPUZBackend>( pDrvData, szDataSize, allocationMode, bClean );
-		else if ( provider == MapperProvider::KKYUM )
-			result = RunKernelRwBackend<KKYUMBackend>( pDrvData, szDataSize, allocationMode, bClean );
-		else if ( provider == MapperProvider::KDMapper )
-			result = RunKernelRwBackend<KDMapperBackend>( pDrvData, szDataSize, allocationMode, bClean );
-		else if ( provider == MapperProvider::VirtualBox )
-			result = RunVirtualBoxBackend( pDrvData, szDataSize, bClean );
-		else
+#else
+			InternalLog( "[-] [kZeroMapper] RTCore64 backend is not enabled in build configuration." );
 			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
+		}
+		else if ( provider == MapperProvider::DirectIO64 )
+		{
+#if defined(KZEROMAPPER_ENABLE_DIRECTIO64)
+			result = RunKernelRwBackend<DirectIO64Backend>( pDrvData, szDataSize, allocationMode, bClean );
+#else
+			InternalLog( "[-] [kZeroMapper] DirectIO64 backend is not enabled in build configuration." );
+			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
+		}
+		else if ( provider == MapperProvider::CPUZ )
+		{
+#if defined(KZEROMAPPER_ENABLE_CPUZ)
+			result = RunKernelRwBackend<CPUZBackend>( pDrvData, szDataSize, allocationMode, bClean );
+#else
+			InternalLog( "[-] [kZeroMapper] CPUZ backend is not enabled in build configuration." );
+			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
+		}
+		else if ( provider == MapperProvider::KKYUM )
+		{
+#if defined(KZEROMAPPER_ENABLE_KKYUM)
+			result = RunKernelRwBackend<KKYUMBackend>( pDrvData, szDataSize, allocationMode, bClean );
+#else
+			InternalLog( "[-] [kZeroMapper] KKYUM backend is not enabled in build configuration." );
+			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
+		}
+		else if ( provider == MapperProvider::KDMapper )
+		{
+#if defined(KZEROMAPPER_ENABLE_KDMAPPER)
+			result = RunKernelRwBackend<KDMapperBackend>( pDrvData, szDataSize, allocationMode, bClean );
+#else
+			InternalLog( "[-] [kZeroMapper] KDMapper backend is not enabled in build configuration." );
+			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
+		}
+		else if ( provider == MapperProvider::VirtualBox )
+		{
+#if defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
+			result = RunVirtualBoxBackend( pDrvData, szDataSize, bClean );
+#else
+			InternalLog( "[-] [kZeroMapper] VirtualBox backend is not enabled in build configuration." );
+			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
+		}
+		else
+		{
+			InternalLog( "[-] [kZeroMapper] Provider not supported or invalid: %d", static_cast<int>( provider ) );
+			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+		}
 
 		g_LastStatus = result;
 		return result;

@@ -1,3 +1,7 @@
+#include <kZeroMapper/kZeroMapperConfig.h>
+
+#if defined(KZEROMAPPER_ENABLE_DIRECTIO64)
+
 #include "DirectIO64Backend.h"
 #include "../Common/VulnerableDriverLoader.h"
 #include "directio64_sys.h"
@@ -277,3 +281,8 @@ bool DirectIO64Backend::ReadWriteVirtual( uint64_t address, void* buffer, size_t
 
 	return true;
 }
+
+
+
+
+#endif // KZEROMAPPER_ENABLE_DIRECTIO64

@@ -1,4 +1,8 @@
 #pragma once
+#include <kZeroMapper/kZeroMapperConfig.h>
+
+#if defined(KZEROMAPPER_ENABLE_DIRECTIO64)
+
 #include "../Common/KernelRwCallBackend.h"
 
 class DirectIO64Backend final : public KernelRwCallBackend
@@ -35,3 +39,8 @@ private:
 	bool VirtualToPhysical( uint64_t virtualAddress, uint64_t* physicalAddress );
 	bool ReadWriteVirtual( uint64_t address, void* buffer, size_t size, bool write );
 };
+
+
+
+
+#endif // KZEROMAPPER_ENABLE_DIRECTIO64

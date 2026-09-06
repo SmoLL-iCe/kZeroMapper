@@ -1,4 +1,8 @@
 #pragma once
+#include <kZeroMapper/kZeroMapperConfig.h>
+
+#if defined(KZEROMAPPER_ENABLE_RTCORE64)
+
 #include "../Common/KernelRwCallBackend.h"
 
 class RTCore64Backend final : public KernelRwCallBackend
@@ -34,3 +38,8 @@ private:
 
 	uint64_t m_NtUserSetGestureConfigRef = 0;
 };
+
+
+
+
+#endif // KZEROMAPPER_ENABLE_RTCORE64
