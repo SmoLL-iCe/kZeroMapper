@@ -1,0 +1,125 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{b3815918-4be5-4a5a-bc05-c624483d3713}</ProjectGuid>
+    <RootNamespace>kZeroMapper</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'!='Debug'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>kZeroMapper</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalIncludeDirectories>include;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <DisableSpecificWarnings>4390;4201;4214;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'!='Debug'">
+    <ClCompile>
+      <Optimization>Full</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="include\kZeroMapper\kZeroMapper.h" />
+    <ClInclude Include="include\kZeroMapper\MapperStatus.h" />
+    <ClInclude Include="include\kZeroMapper\MapperTypes.h" />
+    <ClInclude Include="include\kZeroMapper\tuturla.h" />
+    <ClInclude Include="src\DriverParse.h" />
+    <ClInclude Include="src\Common\Clean.h" />
+    <ClInclude Include="src\Common\KernelRwCallBackend.h" />
+    <ClInclude Include="src\Common\MapperBackend.h" />
+    <ClInclude Include="src\Common\MapperExecutor.h" />
+    <ClInclude Include="src\Common\MapperLogging.h" />
+    <ClInclude Include="src\Common\MapperSecurity.h" />
+    <ClInclude Include="src\Common\MapperUtils.h" />
+    <ClInclude Include="src\Common\ntos.h" />
+    <ClInclude Include="src\Common\skCrypt.h" />
+    <ClInclude Include="src\Common\VulnerableDriverLoader.h" />
+    <ClInclude Include="src\DirectIO64\DirectIO64Backend.h" />
+    <ClInclude Include="src\DirectIO64\directio64_sys.h" />
+    <ClInclude Include="src\DirectIO64\halamd64.h" />
+    <ClInclude Include="src\KDMapper\intel_sys.h" />
+    <ClInclude Include="src\KDMapper\KDMapperBackend.h" />
+    <ClInclude Include="src\RTCore64\RTCore64Backend.h" />
+    <ClInclude Include="src\RTCore64\RTCore64_sys.h" />
+    <ClInclude Include="src\VirtualBox\vbox.h" />
+    <ClInclude Include="src\VirtualBox\vbox_sys.h" />
+    <ClInclude Include="src\VirtualBox\VirtualBoxBackend.h" />
+    <ClInclude Include="src\CPUZ\CPUZBackend.h" />
+    <ClInclude Include="src\CPUZ\cpuz_sys.h" />
+    <ClInclude Include="src\KKYUM\KKYUMBackend.h" />
+    <ClInclude Include="src\KKYUM\KKYUM_sys.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\Common\Clean.cpp" />
+    <ClCompile Include="src\Common\KernelRwCallBackend.cpp" />
+    <ClCompile Include="src\Common\MapperExecutor.cpp" />
+    <ClCompile Include="src\Common\MapperUtils.cpp" />
+    <ClCompile Include="src\Common\VulnerableDriverLoader.cpp" />
+    <ClCompile Include="src\CPUZ\CPUZBackend.cpp" />
+    <ClCompile Include="src\DirectIO64\DirectIO64Backend.cpp" />
+    <ClCompile Include="src\DriverParse.cpp" />
+    <ClCompile Include="src\KDMapper\KDMapperBackend.cpp" />
+    <ClCompile Include="src\kZeroMapper.cpp" />
+    <ClCompile Include="src\KKYUM\KKYUMBackend.cpp" />
+    <ClCompile Include="src\RTCore64\RTCore64Backend.cpp" />
+    <ClCompile Include="src\VirtualBox\VirtualBoxBackend.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

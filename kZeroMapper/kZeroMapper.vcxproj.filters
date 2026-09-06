@@ -1,0 +1,165 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="include">
+      <UniqueIdentifier>{6d987e38-4e1b-4f9e-a6c3-1d072b22f281}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\kZeroMapper">
+      <UniqueIdentifier>{a989f5bc-b7eb-4f4c-bc69-14a0ff48ff72}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{b14421b4-7833-4ca2-8db4-f06b6efdf448}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Common">
+      <UniqueIdentifier>{e83d808c-9a4f-4d16-b847-e17f54cba799}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\CPUZ">
+      <UniqueIdentifier>{b4e7c476-d2b5-4ad8-8e0d-735bcdff29c4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\DirectIO64">
+      <UniqueIdentifier>{897fec63-a261-460d-85ad-bf7f09315570}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\KDMapper">
+      <UniqueIdentifier>{de96cb4d-ec5a-47fa-bd7c-e4f6cb65fbf8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\KKYUM">
+      <UniqueIdentifier>{d080ef3f-2184-4ab6-b1a1-dd70b477d4b5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\RTCore64">
+      <UniqueIdentifier>{99908cf4-1ec7-4638-89c0-93cb99a5e84a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\VirtualBox">
+      <UniqueIdentifier>{e26a3190-675e-4c74-a69a-24ea9ee37b92}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\kZeroMapper\kZeroMapper.h">
+      <Filter>include\kZeroMapper</Filter>
+    </ClInclude>
+    <ClInclude Include="include\kZeroMapper\MapperStatus.h">
+      <Filter>include\kZeroMapper</Filter>
+    </ClInclude>
+    <ClInclude Include="include\kZeroMapper\MapperTypes.h">
+      <Filter>include\kZeroMapper</Filter>
+    </ClInclude>
+    <ClInclude Include="include\kZeroMapper\tuturla.h">
+      <Filter>include\kZeroMapper</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DriverParse.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\Clean.h">
+      <Filter>src\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\KernelRwCallBackend.h">
+      <Filter>src\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\MapperBackend.h">
+      <Filter>src\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\MapperExecutor.h">
+      <Filter>src\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\MapperLogging.h">
+      <Filter>src\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\MapperSecurity.h">
+      <Filter>src\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\MapperUtils.h">
+      <Filter>src\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\ntos.h">
+      <Filter>src\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\skCrypt.h">
+      <Filter>src\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Common\VulnerableDriverLoader.h">
+      <Filter>src\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CPUZ\CPUZBackend.h">
+      <Filter>src\CPUZ</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CPUZ\cpuz_sys.h">
+      <Filter>src\CPUZ</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DirectIO64\DirectIO64Backend.h">
+      <Filter>src\DirectIO64</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DirectIO64\directio64_sys.h">
+      <Filter>src\DirectIO64</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DirectIO64\halamd64.h">
+      <Filter>src\DirectIO64</Filter>
+    </ClInclude>
+    <ClInclude Include="src\KDMapper\intel_sys.h">
+      <Filter>src\KDMapper</Filter>
+    </ClInclude>
+    <ClInclude Include="src\KDMapper\KDMapperBackend.h">
+      <Filter>src\KDMapper</Filter>
+    </ClInclude>
+    <ClInclude Include="src\KKYUM\KKYUMBackend.h">
+      <Filter>src\KKYUM</Filter>
+    </ClInclude>
+    <ClInclude Include="src\KKYUM\KKYUM_sys.h">
+      <Filter>src\KKYUM</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RTCore64\RTCore64Backend.h">
+      <Filter>src\RTCore64</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RTCore64\RTCore64_sys.h">
+      <Filter>src\RTCore64</Filter>
+    </ClInclude>
+    <ClInclude Include="src\VirtualBox\vbox.h">
+      <Filter>src\VirtualBox</Filter>
+    </ClInclude>
+    <ClInclude Include="src\VirtualBox\vbox_sys.h">
+      <Filter>src\VirtualBox</Filter>
+    </ClInclude>
+    <ClInclude Include="src\VirtualBox\VirtualBoxBackend.h">
+      <Filter>src\VirtualBox</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\DriverParse.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\kZeroMapper.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Common\Clean.cpp">
+      <Filter>src\Common</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Common\KernelRwCallBackend.cpp">
+      <Filter>src\Common</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Common\MapperExecutor.cpp">
+      <Filter>src\Common</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Common\MapperUtils.cpp">
+      <Filter>src\Common</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Common\VulnerableDriverLoader.cpp">
+      <Filter>src\Common</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CPUZ\CPUZBackend.cpp">
+      <Filter>src\CPUZ</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DirectIO64\DirectIO64Backend.cpp">
+      <Filter>src\DirectIO64</Filter>
+    </ClCompile>
+    <ClCompile Include="src\KDMapper\KDMapperBackend.cpp">
+      <Filter>src\KDMapper</Filter>
+    </ClCompile>
+    <ClCompile Include="src\KKYUM\KKYUMBackend.cpp">
+      <Filter>src\KKYUM</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RTCore64\RTCore64Backend.cpp">
+      <Filter>src\RTCore64</Filter>
+    </ClCompile>
+    <ClCompile Include="src\VirtualBox\VirtualBoxBackend.cpp">
+      <Filter>src\VirtualBox</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
