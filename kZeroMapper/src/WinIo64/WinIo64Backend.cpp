@@ -3,7 +3,7 @@
 #if defined(KZEROMAPPER_ENABLE_WINIO64)
 
 #include "WinIo64Backend.h"
-#include "../Common/VulnerableDriverLoader.h"
+#include "../Common/vDriverLoader.h"
 #include "winio64_sys.h"
 #include "../DirectIO64/halamd64.h"
 #include <algorithm>

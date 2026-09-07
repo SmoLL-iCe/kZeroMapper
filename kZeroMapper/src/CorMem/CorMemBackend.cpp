@@ -3,7 +3,7 @@
 #if defined(KZEROMAPPER_ENABLE_CORMEM)
 
 #include "CorMemBackend.h"
-#include "../Common/VulnerableDriverLoader.h"
+#include "../Common/vDriverLoader.h"
 #include "cormem_sys.h"
 #include "../DirectIO64/halamd64.h"
 #include <algorithm>

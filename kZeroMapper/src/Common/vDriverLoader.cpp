@@ -1,4 +1,4 @@
-#include "VulnerableDriverLoader.h"
+#include "vDriverLoader.h"
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -541,12 +541,12 @@ NTSTATUS DropLoadAndOpenMapperDriver( const char* backendName, const wchar_t* de
 
 	if ( !*deviceHandle || *deviceHandle == INVALID_HANDLE_VALUE )
 	{
-		LOG_SEC( "[-] - [%s] SCM: Driver device open failure", backendName );
+		LOG_SEC( "[-] - [%s] SCM: Driver device open failure gle=%lu path=%ls", backendName, GetLastError( ), devicePath );
 		UnloadMapperDriver( ansiServiceName.c_str( ) );
 		return statusBase + 3;
 	}
 
-	LOG_SEC( "[!] - [%s] SCM: Vulnerable driver loaded as %s and opened", backendName, ansiServiceName.c_str( ) );
+	LOG_SEC( "[!] - [%s] SCM: V. driver loaded as %s and opened", backendName, ansiServiceName.c_str( ) );
 	return STATUS_SUCCESS;
 }
 

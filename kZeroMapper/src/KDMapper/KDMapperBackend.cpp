@@ -3,7 +3,7 @@
 #if defined(KZEROMAPPER_ENABLE_KDMAPPER)
 
 #include "KDMapperBackend.h"
-#include "../Common/VulnerableDriverLoader.h"
+#include "../Common/vDriverLoader.h"
 #include <kZeroMapper/MapperStatus.h>
 #include "intel_sys.h"
 

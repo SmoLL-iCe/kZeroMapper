@@ -94,7 +94,7 @@
     <ClInclude Include="src\Common\MapperUtils.h" />
     <ClInclude Include="src\Common\ntos.h" />
     <ClInclude Include="src\Common\skCrypt.h" />
-    <ClInclude Include="src\Common\VulnerableDriverLoader.h" />
+    <ClInclude Include="src\Common\vDriverLoader.h" />
     <ClInclude Include="src\DirectIO64\DirectIO64Backend.h" />
     <ClInclude Include="src\DirectIO64\directio64_sys.h" />
     <ClInclude Include="src\DirectIO64\halamd64.h" />
@@ -121,7 +121,7 @@
     <ClCompile Include="src\Common\KernelRwCallBackend.cpp" />
     <ClCompile Include="src\Common\MapperExecutor.cpp" />
     <ClCompile Include="src\Common\MapperUtils.cpp" />
-    <ClCompile Include="src\Common\VulnerableDriverLoader.cpp" />
+    <ClCompile Include="src\Common\vDriverLoader.cpp" />
     <ClCompile Include="src\DirectIO64\DirectIO64Backend.cpp" />
     <ClCompile Include="src\DriverParse.cpp" />
     <ClCompile Include="src\KDMapper\KDMapperBackend.cpp" />

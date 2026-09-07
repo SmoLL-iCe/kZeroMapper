@@ -90,7 +90,7 @@
     <ClInclude Include="src\Common\skCrypt.h">
       <Filter>src\Common</Filter>
     </ClInclude>
-    <ClInclude Include="src\Common\VulnerableDriverLoader.h">
+    <ClInclude Include="src\Common\vDriverLoader.h">
       <Filter>src\Common</Filter>
     </ClInclude>
     <ClInclude Include="src\DirectIO64\DirectIO64Backend.h">
@@ -173,7 +173,7 @@
     <ClCompile Include="src\Common\MapperUtils.cpp">
       <Filter>src\Common</Filter>
     </ClCompile>
-    <ClCompile Include="src\Common\VulnerableDriverLoader.cpp">
+    <ClCompile Include="src\Common\vDriverLoader.cpp">
       <Filter>src\Common</Filter>
     </ClCompile>
     <ClCompile Include="src\DirectIO64\DirectIO64Backend.cpp">

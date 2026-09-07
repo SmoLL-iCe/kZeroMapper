@@ -3,7 +3,7 @@
 #if defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
 
 #include "VirtualBoxBackend.h"
-#include "../Common/VulnerableDriverLoader.h"
+#include "../Common/vDriverLoader.h"
 #include "vbox.h"
 #include "vbox_sys.h"
 #include <string>

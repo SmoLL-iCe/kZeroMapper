@@ -3,7 +3,7 @@
 #if defined(KZEROMAPPER_ENABLE_PCDSRVC)
 
 #include "PCDSRVCBackend.h"
-#include "../Common/VulnerableDriverLoader.h"
+#include "../Common/vDriverLoader.h"
 #include "pcdsrvc_sys.h"
 #include "../DirectIO64/halamd64.h"
 #include <algorithm>

@@ -3,7 +3,7 @@
 #if defined(KZEROMAPPER_ENABLE_KKYUM)
 
 #include "KKYUMBackend.h"
-#include "../Common/VulnerableDriverLoader.h"
+#include "../Common/vDriverLoader.h"
 #include "KKYUM_sys.h"
 
 namespace
