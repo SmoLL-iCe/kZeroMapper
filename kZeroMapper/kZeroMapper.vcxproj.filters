@@ -31,6 +31,9 @@
     <Filter Include="src\CorMem">
       <UniqueIdentifier>{c9e3b5a6-6d7f-4081-a9d-ae1f2a3b4c5d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\WinIo64">
+      <UniqueIdentifier>{d0f4c6b7-7e80-4192-baeb-f2a3b4c5d6e7}</UniqueIdentifier>
+    </Filter>
     <Filter Include="src\RTCore64">
       <UniqueIdentifier>{99908cf4-1ec7-4638-89c0-93cb99a5e84a}</UniqueIdentifier>
     </Filter>
@@ -129,11 +132,11 @@
     <ClInclude Include="src\CorMem\cormem_sys.h">
       <Filter>src\CorMem</Filter>
     </ClInclude>
-    <ClInclude Include="src\CorMem\WinIo64Backend.h">
-      <Filter>src\CorMem</Filter>
+    <ClInclude Include="src\WinIo64\WinIo64Backend.h">
+      <Filter>src\WinIo64</Filter>
     </ClInclude>
-    <ClInclude Include="src\CorMem\winio64_sys.h">
-      <Filter>src\CorMem</Filter>
+    <ClInclude Include="src\WinIo64\winio64_sys.h">
+      <Filter>src\WinIo64</Filter>
     </ClInclude>
     <ClInclude Include="src\RTCore64\RTCore64Backend.h">
       <Filter>src\RTCore64</Filter>
@@ -191,8 +194,8 @@
     <ClCompile Include="src\CorMem\CorMemBackend.cpp">
       <Filter>src\CorMem</Filter>
     </ClCompile>
-    <ClCompile Include="src\CorMem\WinIo64Backend.cpp">
-      <Filter>src\CorMem</Filter>
+    <ClCompile Include="src\WinIo64\WinIo64Backend.cpp">
+      <Filter>src\WinIo64</Filter>
     </ClCompile>
     <ClCompile Include="src\RTCore64\RTCore64Backend.cpp">
       <Filter>src\RTCore64</Filter>

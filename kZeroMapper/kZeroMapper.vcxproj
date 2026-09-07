@@ -113,8 +113,8 @@
     <ClInclude Include="src\PPA64\ppa_x64_sys.h" />
     <ClInclude Include="src\CorMem\CorMemBackend.h" />
     <ClInclude Include="src\CorMem\cormem_sys.h" />
-    <ClInclude Include="src\CorMem\WinIo64Backend.h" />
-    <ClInclude Include="src\CorMem\winio64_sys.h" />
+    <ClInclude Include="src\WinIo64\WinIo64Backend.h" />
+    <ClInclude Include="src\WinIo64\winio64_sys.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Common\Clean.cpp" />
@@ -130,7 +130,7 @@
     <ClCompile Include="src\PCDSRVC\PCDSRVCBackend.cpp" />
     <ClCompile Include="src\PPA64\PPA64Backend.cpp" />
     <ClCompile Include="src\CorMem\CorMemBackend.cpp" />
-    <ClCompile Include="src\CorMem\WinIo64Backend.cpp" />
+    <ClCompile Include="src\WinIo64\WinIo64Backend.cpp" />
     <ClCompile Include="src\RTCore64\RTCore64Backend.cpp" />
     <ClCompile Include="src\VirtualBox\VirtualBoxBackend.cpp" />
   </ItemGroup>
