@@ -15,8 +15,6 @@ namespace kZeroMapper {
 		VirtualBox,
 		RTCore64,
 		DirectIO64,
-		PCDSRVC,
-		PPA64,
 		CorMem,
 		WinIo64,
 		KKYUM,

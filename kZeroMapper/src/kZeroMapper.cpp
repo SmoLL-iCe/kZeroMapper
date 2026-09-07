@@ -16,13 +16,6 @@
 #include "KKYUM/KKYUMBackend.h"
 #endif
 
-#if defined(KZEROMAPPER_ENABLE_PCDSRVC)
-#include "PCDSRVC/PCDSRVCBackend.h"
-#endif
-
-#if defined(KZEROMAPPER_ENABLE_PPA64)
-#include "PPA64/PPA64Backend.h"
-#endif
 
 #if defined(KZEROMAPPER_ENABLE_CORMEM)
 #include "CorMem/CorMemBackend.h"
@@ -122,18 +115,7 @@ namespace kZeroMapper
 #else
 			return false;
 #endif
-		case MapperProvider::PCDSRVC:
-#if defined(KZEROMAPPER_ENABLE_PCDSRVC)
-			return true;
-#else
-			return false;
-#endif
-		case MapperProvider::PPA64:
-#if defined(KZEROMAPPER_ENABLE_PPA64)
-			return true;
-#else
-			return false;
-#endif
+
 		case MapperProvider::CorMem:
 #if defined(KZEROMAPPER_ENABLE_CORMEM)
 			return true;
@@ -171,10 +153,7 @@ namespace kZeroMapper
 		return MapDriver( MapperProvider::RTCore64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
 #elif defined(KZEROMAPPER_ENABLE_DIRECTIO64)
 		return MapDriver( MapperProvider::DirectIO64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#elif defined(KZEROMAPPER_ENABLE_PCDSRVC)
-		return MapDriver( MapperProvider::PCDSRVC, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#elif defined(KZEROMAPPER_ENABLE_PPA64)
-		return MapDriver( MapperProvider::PPA64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+
 #elif defined(KZEROMAPPER_ENABLE_CORMEM)
 		return MapDriver( MapperProvider::CorMem, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
 #elif defined(KZEROMAPPER_ENABLE_WINIO64)
@@ -197,10 +176,7 @@ namespace kZeroMapper
 	return MapDriver( MapperProvider::RTCore64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
 #elif defined(KZEROMAPPER_ENABLE_DIRECTIO64)
 	return MapDriver( MapperProvider::DirectIO64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#elif defined(KZEROMAPPER_ENABLE_PCDSRVC)
-	return MapDriver( MapperProvider::PCDSRVC, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#elif defined(KZEROMAPPER_ENABLE_PPA64)
-	return MapDriver( MapperProvider::PPA64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+
 #elif defined(KZEROMAPPER_ENABLE_CORMEM)
 	return MapDriver( MapperProvider::CorMem, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
 #elif defined(KZEROMAPPER_ENABLE_WINIO64)
@@ -247,24 +223,7 @@ namespace kZeroMapper
 			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
 #endif
 		}
-		else if ( provider == MapperProvider::PCDSRVC )
-		{
-#if defined(KZEROMAPPER_ENABLE_PCDSRVC)
-			result = RunKernelRwBackend<PCDSRVCBackend>( pDrvData, szDataSize, allocationMode, bClean );
-#else
-			InternalLog( "[-] [kZeroMapper] PCDSRVC backend is not enabled in build configuration." );
-			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
-#endif
-		}
-		else if ( provider == MapperProvider::PPA64 )
-		{
-#if defined(KZEROMAPPER_ENABLE_PPA64)
-			result = RunKernelRwBackend<PPA64Backend>( pDrvData, szDataSize, allocationMode, bClean );
-#else
-			InternalLog( "[-] [kZeroMapper] PPA64 backend is not enabled in build configuration." );
-			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
-#endif
-		}
+
 		else if ( provider == MapperProvider::CorMem )
 		{
 #if defined(KZEROMAPPER_ENABLE_CORMEM)
