@@ -33,6 +33,8 @@ private:
 	bool VirtualToPhysicalWithCr3( uint64_t cr3, uint64_t virtualAddress, uint64_t* physicalAddress );
 	bool VirtualToPhysicalByTableWalk( uint64_t virtualAddress, uint64_t* physicalAddress );
 	bool ReadWriteVirtual( uint64_t address, void* buffer, size_t size, bool write );
+
+	uint64_t m_Pml4Cache = 0;
 };
 
 

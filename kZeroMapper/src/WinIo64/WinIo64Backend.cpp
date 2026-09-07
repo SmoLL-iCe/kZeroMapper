@@ -227,6 +227,12 @@ bool WinIo64Backend::QueryPml4( uint64_t* value )
 	if ( !value )
 		return false;
 
+	if ( m_Pml4Cache )
+	{
+		*value = m_Pml4Cache;
+		return true;
+	}
+
 	*value = 0;
 
 	const ULONG mapSize = 0x1000000;
@@ -259,6 +265,7 @@ bool WinIo64Backend::QueryPml4( uint64_t* value )
 
 		if ( ValidateCr3WithNtoskrnl( rawCr3 ) )
 		{
+			m_Pml4Cache = rawCr3;
 			*value = rawCr3;
 			LOG_SEC( "[*] - [WinIo64] QueryPml4 validated pml4=0x%llx", *value );
 			return true;
@@ -282,6 +289,7 @@ bool WinIo64Backend::QueryPml4( uint64_t* value )
 
 			if ( ValidateCr3WithNtoskrnl( kptiCandidates[ i ] ) )
 			{
+				m_Pml4Cache = kptiCandidates[ i ];
 				*value = kptiCandidates[ i ];
 				LOG_SEC( "[*] - [WinIo64] QueryPml4 KPTI kernel cr3=0x%llx (variant %d, user=0x%llx)",
 					*value, i, rawCr3 );
@@ -328,6 +336,7 @@ bool WinIo64Backend::QueryPml4( uint64_t* value )
 
 		++tested;
 
+		m_Pml4Cache = candidate;
 		*value = candidate;
 		LOG_SEC( "[*] - [WinIo64] QueryPml4 found pml4=0x%llx at offset=0x%llx (tested=%lu)",
 			*value, i * 8, tested );
@@ -411,7 +420,6 @@ bool WinIo64Backend::VirtualToPhysicalByTableWalk( uint64_t virtualAddress, uint
 		return false;
 	}
 
-	LOG_SEC( "[*] - [WinIo64] VirtualToPhysicalByTableWalk va=0x%llx pa=0x%llx pml4=0x%llx", virtualAddress, *physicalAddress, pml4 );
 	return true;
 }
 

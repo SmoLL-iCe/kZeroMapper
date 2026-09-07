@@ -109,18 +109,9 @@ std::string CorMemBackend::Name( ) const
 
 NTSTATUS CorMemBackend::Load( )
 {
-	const auto status = KernelRwCallBackend::Load( );
+	m_CallGate = KernelCallGate::NtQueryAtom;
 
-	if ( status != STATUS_SUCCESS )
-		return status;
-
-	if ( !m_NtUserSetGestureConfigRef )
-	{
-		LOG_SEC( "[-] - [CorMem] NtUserSetGestureConfig_ref not found" );
-		return 0x9170;
-	}
-
-	return STATUS_SUCCESS;
+	return KernelRwCallBackend::Load( );
 }
 
 NTSTATUS CorMemBackend::LoadDevice( )
@@ -169,7 +160,11 @@ bool CorMemBackend::MapPhysical( uint64_t physicalAddress, uint64_t size, uint64
 	bool mapped = false;
 	DWORD gle = 0;
 
-	for ( int attempt = 0; attempt < 10 && !mapped; ++attempt )
+	// During the CR3 scan (quiet mode) failures are expected and frequent;
+	// retrying each one with sleeps would stall the scan for minutes.
+	const int maxAttempts = m_QuietMode ? 1 : 10;
+
+	for ( int attempt = 0; attempt < maxAttempts && !mapped; ++attempt )
 	{
 		if ( attempt > 0 )
 			Sleep( 20 );
@@ -450,7 +445,6 @@ bool CorMemBackend::VirtualToPhysicalByTableWalk( uint64_t virtualAddress, uint6
 		return false;
 	}
 
-	LOG_SEC( "[*] - [CorMem] VirtualToPhysicalByTableWalk va=0x%llx pa=0x%llx pml4=0x%llx", virtualAddress, *physicalAddress, pml4 );
 	return true;
 }
 
@@ -480,12 +474,41 @@ bool CorMemBackend::ReadWriteVirtual( uint64_t address, void* buffer, size_t siz
 
 bool CorMemBackend::ReadMemory( uint64_t address, void* buffer, size_t size )
 {
-	const auto result = ReadWriteVirtual( address, buffer, size, false );
+	// Session-space drivers (win32kfull etc.) have pageable regions; a PTE with
+	// present=0 means the page is paged out. Zero-fill those and retry later
+	// instead of failing the whole read.
+	auto bytes = r_cast<uint8_t*>( buffer );
 
-	if ( !result )
-		LOG_SEC( "[-] - [CorMem] ReadMemory failed va=0x%llx size=0x%llx", address, size );
+	for ( int attempt = 0; attempt < 3; ++attempt )
+	{
+		if ( attempt > 0 )
+			Sleep( 200 );
 
-	return result;
+		size_t offset = 0;
+		size_t failed = 0;
+
+		while ( offset < size )
+		{
+			const auto currentAddress = address + offset;
+			const auto pageLeft = 0x1000 - ( currentAddress & 0xFFF );
+			const auto chunk = s_cast<size_t>( std::min<uint64_t>( pageLeft, size - offset ) );
+
+			if ( !ReadWriteVirtual( currentAddress, bytes + offset, chunk, false ) )
+			{
+				memset( bytes + offset, 0, chunk );
+				++failed;
+			}
+
+			offset += chunk;
+		}
+
+		if ( failed == 0 )
+			return true;
+
+		LOG_SEC( "[*] - [CorMem] ReadMemory %zu/%zu pages paged out va=0x%llx (attempt %d)", failed, ( size + 0xFFF ) / 0x1000, address, attempt + 1 );
+	}
+
+	return false;
 }
 
 bool CorMemBackend::WriteMemory( uint64_t address, const void* buffer, size_t size )
