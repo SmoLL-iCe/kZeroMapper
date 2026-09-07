@@ -93,6 +93,9 @@
     <ClInclude Include="src\Common\vDriverLoader.h">
       <Filter>src\Common</Filter>
     </ClInclude>
+    <ClInclude Include="src\Common\TableWalkBackend.h">
+      <Filter>src\Common</Filter>
+    </ClInclude>
     <ClInclude Include="src\DirectIO64\DirectIO64Backend.h">
       <Filter>src\DirectIO64</Filter>
     </ClInclude>
@@ -174,6 +177,9 @@
       <Filter>src\Common</Filter>
     </ClCompile>
     <ClCompile Include="src\Common\vDriverLoader.cpp">
+      <Filter>src\Common</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Common\TableWalkBackend.cpp">
       <Filter>src\Common</Filter>
     </ClCompile>
     <ClCompile Include="src\DirectIO64\DirectIO64Backend.cpp">

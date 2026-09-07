@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
     std::cout << "[*] Mapping driver using kZeroMapper..." << std::endl;
 
     const NTSTATUS status = kZeroMapper::MapDriver( 
-        kZeroMapper::MapperProvider::DirectIO64,
+        kZeroMapper::MapperProvider::PCDSRVC,
         driverBuffer.data( ),
         driverBuffer.size( ), 
         kZeroMapper::KernelAllocationMode::Pool, 

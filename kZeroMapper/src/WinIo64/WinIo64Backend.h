@@ -3,38 +3,33 @@
 
 #if defined(KZEROMAPPER_ENABLE_WINIO64)
 
-#include "../Common/KernelRwCallBackend.h"
+#include "../Common/TableWalkBackend.h"
 
-class WinIo64Backend final : public KernelRwCallBackend
+class WinIo64Backend final : public TableWalkBackend
 {
 public:
-	WinIo64Backend( )
-	{
-		m_CallGate = KernelCallGate::TableSwap;
-	}
-
 	std::string Name( ) const override;
-	NTSTATUS Load( ) override;
 
 protected:
 	NTSTATUS LoadDevice( ) override;
 	NTSTATUS UnloadDevice( ) override;
-	bool ReadMemory( uint64_t address, void* buffer, size_t size ) override;
-	bool WriteMemory( uint64_t address, const void* buffer, size_t size ) override;
+	ULONG GetLowMemoryChunkSize( ) const override;
+	bool ReadWritePhysical( uint64_t physicalAddress, void* buffer, uint64_t bytes, bool write ) override;
 
 private:
+	#pragma pack(push, 1)
+	struct WinIoMapRequest
+	{
+		uint64_t Size;             // offset 0x00: bytes to map
+		uint64_t PhysicalAddress;  // offset 0x08
+		uint64_t Handle;           // offset 0x10: out, section handle (driver)
+		uint64_t LinearAddress;    // offset 0x18: out, mapped VA (driver)
+		uint64_t SectionObject;    // offset 0x20: out, section object (driver)
+	};
+	#pragma pack(pop)
+
 	bool MapPhysical( uint64_t physicalAddress, uint64_t size, uint64_t* virtualAddress );
 	bool UnmapPhysical( uint64_t virtualAddress );
-	bool ReadWritePhysical( uint64_t physicalAddress, void* buffer, uint64_t bytes, bool write );
-
-	bool QueryPml4( uint64_t* value );
-	bool ValidateCr3WithNtoskrnl( uint64_t cr3 );
-	static bool PageEntryToPhysicalAddress( uint64_t entry, uint64_t* physicalAddress );
-	bool VirtualToPhysicalWithCr3( uint64_t cr3, uint64_t virtualAddress, uint64_t* physicalAddress );
-	bool VirtualToPhysicalByTableWalk( uint64_t virtualAddress, uint64_t* physicalAddress );
-	bool ReadWriteVirtual( uint64_t address, void* buffer, size_t size, bool write );
-
-	uint64_t m_Pml4Cache = 0;
 };
 
 
