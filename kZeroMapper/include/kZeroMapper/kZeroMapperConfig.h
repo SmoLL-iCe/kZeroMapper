@@ -19,20 +19,19 @@
 #ifndef KZEROMAPPER_CUSTOM_CONFIG
 
 // Habilite ou desabilite os provedores que desejar compilar na lib:
-#define KZEROMAPPER_ENABLE_CPUZ
 #define KZEROMAPPER_ENABLE_DIRECTIO64
 #define KZEROMAPPER_ENABLE_KDMAPPER
 #define KZEROMAPPER_ENABLE_KKYUM
+#define KZEROMAPPER_ENABLE_PCDSRVC
+#define KZEROMAPPER_ENABLE_PPA64
+#define KZEROMAPPER_ENABLE_CORMEM
+#define KZEROMAPPER_ENABLE_WINIO64
 #define KZEROMAPPER_ENABLE_RTCORE64
 #define KZEROMAPPER_ENABLE_VIRTUALBOX
 
 #endif
 
 // Suporte a macros alternativas ou passadas por flag de compilação (/D)
-#if defined(ENABLE_CPUZ) && !defined(KZEROMAPPER_ENABLE_CPUZ)
-#define KZEROMAPPER_ENABLE_CPUZ
-#endif
-
 #if defined(ENABLE_DIRECTIO64) && !defined(KZEROMAPPER_ENABLE_DIRECTIO64)
 #define KZEROMAPPER_ENABLE_DIRECTIO64
 #endif
@@ -45,6 +44,22 @@
 #define KZEROMAPPER_ENABLE_KKYUM
 #endif
 
+#if defined(ENABLE_PCDSRVC) && !defined(KZEROMAPPER_ENABLE_PCDSRVC)
+#define KZEROMAPPER_ENABLE_PCDSRVC
+#endif
+
+#if defined(ENABLE_PPA64) && !defined(KZEROMAPPER_ENABLE_PPA64)
+#define KZEROMAPPER_ENABLE_PPA64
+#endif
+
+#if defined(ENABLE_CORMEM) && !defined(KZEROMAPPER_ENABLE_CORMEM)
+#define KZEROMAPPER_ENABLE_CORMEM
+#endif
+
+#if defined(ENABLE_WINIO64) && !defined(KZEROMAPPER_ENABLE_WINIO64)
+#define KZEROMAPPER_ENABLE_WINIO64
+#endif
+
 #if defined(ENABLE_RTCORE64) && !defined(KZEROMAPPER_ENABLE_RTCORE64)
 #define KZEROMAPPER_ENABLE_RTCORE64
 #endif
@@ -54,9 +69,6 @@
 #endif
 
 // Aliases curtos quando habilitados
-#if defined(KZEROMAPPER_ENABLE_CPUZ)
-#define ENABLE_CPUZ
-#endif
 #if defined(KZEROMAPPER_ENABLE_DIRECTIO64)
 #define ENABLE_DIRECTIO64
 #endif
@@ -66,9 +78,22 @@
 #if defined(KZEROMAPPER_ENABLE_KKYUM)
 #define ENABLE_KKYUM
 #endif
+#if defined(KZEROMAPPER_ENABLE_PCDSRVC)
+#define ENABLE_PCDSRVC
+#endif
+#if defined(KZEROMAPPER_ENABLE_PPA64)
+#define ENABLE_PPA64
+#endif
+#if defined(KZEROMAPPER_ENABLE_CORMEM)
+#define ENABLE_CORMEM
+#endif
+#if defined(KZEROMAPPER_ENABLE_WINIO64)
+#define ENABLE_WINIO64
+#endif
 #if defined(KZEROMAPPER_ENABLE_RTCORE64)
 #define ENABLE_RTCORE64
 #endif
 #if defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
 #define ENABLE_VIRTUALBOX
 #endif
+

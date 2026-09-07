@@ -2,7 +2,6 @@
 #include <cstdarg>
 #include <cstdio>
 #include <Windows.h>
-#define WITH_LOGS
 
 namespace kZeroMapper {
 	void InternalLog(const char* fmt, ...);

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <cstdint>
 
 namespace kZeroMapper {
@@ -15,7 +15,10 @@ namespace kZeroMapper {
 		VirtualBox,
 		RTCore64,
 		DirectIO64,
-		CPUZ,
+		PCDSRVC,
+		PPA64,
+		CorMem,
+		WinIo64,
 		KKYUM,
 		KDMapper,
 		Auto

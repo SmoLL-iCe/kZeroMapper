@@ -3,9 +3,6 @@
 #include "Common/MapperExecutor.h"
 #include "Common/MapperLogging.h"
 
-#if defined(KZEROMAPPER_ENABLE_CPUZ)
-#include "CPUZ/CPUZBackend.h"
-#endif
 
 #if defined(KZEROMAPPER_ENABLE_DIRECTIO64)
 #include "DirectIO64/DirectIO64Backend.h"
@@ -17,6 +14,22 @@
 
 #if defined(KZEROMAPPER_ENABLE_KKYUM)
 #include "KKYUM/KKYUMBackend.h"
+#endif
+
+#if defined(KZEROMAPPER_ENABLE_PCDSRVC)
+#include "PCDSRVC/PCDSRVCBackend.h"
+#endif
+
+#if defined(KZEROMAPPER_ENABLE_PPA64)
+#include "PPA64/PPA64Backend.h"
+#endif
+
+#if defined(KZEROMAPPER_ENABLE_CORMEM)
+#include "CorMem/CorMemBackend.h"
+#endif
+
+#if defined(KZEROMAPPER_ENABLE_WINIO64)
+#include "CorMem/WinIo64Backend.h"
 #endif
 
 #if defined(KZEROMAPPER_ENABLE_RTCORE64)
@@ -91,12 +104,6 @@ namespace kZeroMapper
 	{
 		switch ( provider )
 		{
-		case MapperProvider::CPUZ:
-#if defined(KZEROMAPPER_ENABLE_CPUZ)
-			return true;
-#else
-			return false;
-#endif
 		case MapperProvider::DirectIO64:
 #if defined(KZEROMAPPER_ENABLE_DIRECTIO64)
 			return true;
@@ -111,6 +118,30 @@ namespace kZeroMapper
 #endif
 		case MapperProvider::KKYUM:
 #if defined(KZEROMAPPER_ENABLE_KKYUM)
+			return true;
+#else
+			return false;
+#endif
+		case MapperProvider::PCDSRVC:
+#if defined(KZEROMAPPER_ENABLE_PCDSRVC)
+			return true;
+#else
+			return false;
+#endif
+		case MapperProvider::PPA64:
+#if defined(KZEROMAPPER_ENABLE_PPA64)
+			return true;
+#else
+			return false;
+#endif
+		case MapperProvider::CorMem:
+#if defined(KZEROMAPPER_ENABLE_CORMEM)
+			return true;
+#else
+			return false;
+#endif
+		case MapperProvider::WinIo64:
+#if defined(KZEROMAPPER_ENABLE_WINIO64)
 			return true;
 #else
 			return false;
@@ -137,40 +168,52 @@ namespace kZeroMapper
 		if ( GetBuildNumber( ) >= 26100 )
 		{
 #if defined(KZEROMAPPER_ENABLE_RTCORE64)
-			return MapDriver( MapperProvider::RTCore64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#elif defined(KZEROMAPPER_ENABLE_CPUZ)
-			return MapDriver( MapperProvider::CPUZ, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#elif defined(KZEROMAPPER_ENABLE_DIRECTIO64)
-			return MapDriver( MapperProvider::DirectIO64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#elif defined(KZEROMAPPER_ENABLE_KKYUM)
-			return MapDriver( MapperProvider::KKYUM, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#elif defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
-			return MapDriver( MapperProvider::VirtualBox, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#elif defined(KZEROMAPPER_ENABLE_KDMAPPER)
-			return MapDriver( MapperProvider::KDMapper, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#else
-			InternalLog( "[-] [kZeroMapper] No kernel backend available at compile time." );
-			return static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
-#endif
-		}
-
-#if defined(KZEROMAPPER_ENABLE_KDMAPPER)
-		return MapDriver( MapperProvider::KDMapper, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#elif defined(KZEROMAPPER_ENABLE_RTCORE64)
 		return MapDriver( MapperProvider::RTCore64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
-#elif defined(KZEROMAPPER_ENABLE_CPUZ)
-		return MapDriver( MapperProvider::CPUZ, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
 #elif defined(KZEROMAPPER_ENABLE_DIRECTIO64)
 		return MapDriver( MapperProvider::DirectIO64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_PCDSRVC)
+		return MapDriver( MapperProvider::PCDSRVC, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_PPA64)
+		return MapDriver( MapperProvider::PPA64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_CORMEM)
+		return MapDriver( MapperProvider::CorMem, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_WINIO64)
+		return MapDriver( MapperProvider::WinIo64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
 #elif defined(KZEROMAPPER_ENABLE_KKYUM)
 		return MapDriver( MapperProvider::KKYUM, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
 #elif defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
 		return MapDriver( MapperProvider::VirtualBox, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_KDMAPPER)
+		return MapDriver( MapperProvider::KDMapper, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
 #else
 		InternalLog( "[-] [kZeroMapper] No kernel backend available at compile time." );
 		return static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
 #endif
 	}
+
+#if defined(KZEROMAPPER_ENABLE_KDMAPPER)
+	return MapDriver( MapperProvider::KDMapper, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_RTCORE64)
+	return MapDriver( MapperProvider::RTCore64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_DIRECTIO64)
+	return MapDriver( MapperProvider::DirectIO64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_PCDSRVC)
+	return MapDriver( MapperProvider::PCDSRVC, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_PPA64)
+	return MapDriver( MapperProvider::PPA64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_CORMEM)
+	return MapDriver( MapperProvider::CorMem, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_WINIO64)
+	return MapDriver( MapperProvider::WinIo64, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_KKYUM)
+	return MapDriver( MapperProvider::KKYUM, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#elif defined(KZEROMAPPER_ENABLE_VIRTUALBOX)
+	return MapDriver( MapperProvider::VirtualBox, pDrvData, szDataSize, KernelAllocationMode::Pool, bClean );
+#else
+	InternalLog( "[-] [kZeroMapper] No kernel backend available at compile time." );
+	return static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
+}
 
 	NTSTATUS MapDriver( MapperProvider provider, void* pDrvData, size_t szDataSize, KernelAllocationMode allocationMode, bool bClean )
 	{
@@ -204,12 +247,39 @@ namespace kZeroMapper
 			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
 #endif
 		}
-		else if ( provider == MapperProvider::CPUZ )
+		else if ( provider == MapperProvider::PCDSRVC )
 		{
-#if defined(KZEROMAPPER_ENABLE_CPUZ)
-			result = RunKernelRwBackend<CPUZBackend>( pDrvData, szDataSize, allocationMode, bClean );
+#if defined(KZEROMAPPER_ENABLE_PCDSRVC)
+			result = RunKernelRwBackend<PCDSRVCBackend>( pDrvData, szDataSize, allocationMode, bClean );
 #else
-			InternalLog( "[-] [kZeroMapper] CPUZ backend is not enabled in build configuration." );
+			InternalLog( "[-] [kZeroMapper] PCDSRVC backend is not enabled in build configuration." );
+			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
+		}
+		else if ( provider == MapperProvider::PPA64 )
+		{
+#if defined(KZEROMAPPER_ENABLE_PPA64)
+			result = RunKernelRwBackend<PPA64Backend>( pDrvData, szDataSize, allocationMode, bClean );
+#else
+			InternalLog( "[-] [kZeroMapper] PPA64 backend is not enabled in build configuration." );
+			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
+		}
+		else if ( provider == MapperProvider::CorMem )
+		{
+#if defined(KZEROMAPPER_ENABLE_CORMEM)
+			result = RunKernelRwBackend<CorMemBackend>( pDrvData, szDataSize, allocationMode, bClean );
+#else
+			InternalLog( "[-] [kZeroMapper] CorMem backend is not enabled in build configuration." );
+			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
+#endif
+		}
+		else if ( provider == MapperProvider::WinIo64 )
+		{
+#if defined(KZEROMAPPER_ENABLE_WINIO64)
+			result = RunKernelRwBackend<WinIo64Backend>( pDrvData, szDataSize, allocationMode, bClean );
+#else
+			InternalLog( "[-] [kZeroMapper] WinIo64 backend is not enabled in build configuration." );
 			result = static_cast<NTSTATUS>( StatusCode::KM_ProviderNotSupported );
 #endif
 		}

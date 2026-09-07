@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -7,6 +7,10 @@
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="TestRelease|x64">
+      <Configuration>TestRelease</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
@@ -70,7 +74,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_LIB;WITH_LOGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -101,10 +105,16 @@
     <ClInclude Include="src\VirtualBox\vbox.h" />
     <ClInclude Include="src\VirtualBox\vbox_sys.h" />
     <ClInclude Include="src\VirtualBox\VirtualBoxBackend.h" />
-    <ClInclude Include="src\CPUZ\CPUZBackend.h" />
-    <ClInclude Include="src\CPUZ\cpuz_sys.h" />
     <ClInclude Include="src\KKYUM\KKYUMBackend.h" />
     <ClInclude Include="src\KKYUM\KKYUM_sys.h" />
+    <ClInclude Include="src\PCDSRVC\PCDSRVCBackend.h" />
+    <ClInclude Include="src\PCDSRVC\pcdsrvc_sys.h" />
+    <ClInclude Include="src\PPA64\PPA64Backend.h" />
+    <ClInclude Include="src\PPA64\ppa_x64_sys.h" />
+    <ClInclude Include="src\CorMem\CorMemBackend.h" />
+    <ClInclude Include="src\CorMem\cormem_sys.h" />
+    <ClInclude Include="src\CorMem\WinIo64Backend.h" />
+    <ClInclude Include="src\CorMem\winio64_sys.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Common\Clean.cpp" />
@@ -112,12 +122,15 @@
     <ClCompile Include="src\Common\MapperExecutor.cpp" />
     <ClCompile Include="src\Common\MapperUtils.cpp" />
     <ClCompile Include="src\Common\VulnerableDriverLoader.cpp" />
-    <ClCompile Include="src\CPUZ\CPUZBackend.cpp" />
     <ClCompile Include="src\DirectIO64\DirectIO64Backend.cpp" />
     <ClCompile Include="src\DriverParse.cpp" />
     <ClCompile Include="src\KDMapper\KDMapperBackend.cpp" />
     <ClCompile Include="src\kZeroMapper.cpp" />
     <ClCompile Include="src\KKYUM\KKYUMBackend.cpp" />
+    <ClCompile Include="src\PCDSRVC\PCDSRVCBackend.cpp" />
+    <ClCompile Include="src\PPA64\PPA64Backend.cpp" />
+    <ClCompile Include="src\CorMem\CorMemBackend.cpp" />
+    <ClCompile Include="src\CorMem\WinIo64Backend.cpp" />
     <ClCompile Include="src\RTCore64\RTCore64Backend.cpp" />
     <ClCompile Include="src\VirtualBox\VirtualBoxBackend.cpp" />
   </ItemGroup>

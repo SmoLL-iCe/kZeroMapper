@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="include">
@@ -13,9 +13,6 @@
     <Filter Include="src\Common">
       <UniqueIdentifier>{e83d808c-9a4f-4d16-b847-e17f54cba799}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\CPUZ">
-      <UniqueIdentifier>{b4e7c476-d2b5-4ad8-8e0d-735bcdff29c4}</UniqueIdentifier>
-    </Filter>
     <Filter Include="src\DirectIO64">
       <UniqueIdentifier>{897fec63-a261-460d-85ad-bf7f09315570}</UniqueIdentifier>
     </Filter>
@@ -24,6 +21,15 @@
     </Filter>
     <Filter Include="src\KKYUM">
       <UniqueIdentifier>{d080ef3f-2184-4ab6-b1a1-dd70b477d4b5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\PCDSRVC">
+      <UniqueIdentifier>{a7c1e2f3-4b5d-4e6f-8a7b-8c9d0e1f2a3b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\PPA64">
+      <UniqueIdentifier>{b8d2f4a5-5c6e-4f70-9a8c-9d0e1f2a3b4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\CorMem">
+      <UniqueIdentifier>{c9e3b5a6-6d7f-4081-a9d-ae1f2a3b4c5d}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\RTCore64">
       <UniqueIdentifier>{99908cf4-1ec7-4638-89c0-93cb99a5e84a}</UniqueIdentifier>
@@ -84,12 +90,6 @@
     <ClInclude Include="src\Common\VulnerableDriverLoader.h">
       <Filter>src\Common</Filter>
     </ClInclude>
-    <ClInclude Include="src\CPUZ\CPUZBackend.h">
-      <Filter>src\CPUZ</Filter>
-    </ClInclude>
-    <ClInclude Include="src\CPUZ\cpuz_sys.h">
-      <Filter>src\CPUZ</Filter>
-    </ClInclude>
     <ClInclude Include="src\DirectIO64\DirectIO64Backend.h">
       <Filter>src\DirectIO64</Filter>
     </ClInclude>
@@ -110,6 +110,30 @@
     </ClInclude>
     <ClInclude Include="src\KKYUM\KKYUM_sys.h">
       <Filter>src\KKYUM</Filter>
+    </ClInclude>
+    <ClInclude Include="src\PCDSRVC\PCDSRVCBackend.h">
+      <Filter>src\PCDSRVC</Filter>
+    </ClInclude>
+    <ClInclude Include="src\PCDSRVC\pcdsrvc_sys.h">
+      <Filter>src\PCDSRVC</Filter>
+    </ClInclude>
+    <ClInclude Include="src\PPA64\PPA64Backend.h">
+      <Filter>src\PPA64</Filter>
+    </ClInclude>
+    <ClInclude Include="src\PPA64\ppa_x64_sys.h">
+      <Filter>src\PPA64</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CorMem\CorMemBackend.h">
+      <Filter>src\CorMem</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CorMem\cormem_sys.h">
+      <Filter>src\CorMem</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CorMem\WinIo64Backend.h">
+      <Filter>src\CorMem</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CorMem\winio64_sys.h">
+      <Filter>src\CorMem</Filter>
     </ClInclude>
     <ClInclude Include="src\RTCore64\RTCore64Backend.h">
       <Filter>src\RTCore64</Filter>
@@ -149,9 +173,6 @@
     <ClCompile Include="src\Common\VulnerableDriverLoader.cpp">
       <Filter>src\Common</Filter>
     </ClCompile>
-    <ClCompile Include="src\CPUZ\CPUZBackend.cpp">
-      <Filter>src\CPUZ</Filter>
-    </ClCompile>
     <ClCompile Include="src\DirectIO64\DirectIO64Backend.cpp">
       <Filter>src\DirectIO64</Filter>
     </ClCompile>
@@ -160,6 +181,18 @@
     </ClCompile>
     <ClCompile Include="src\KKYUM\KKYUMBackend.cpp">
       <Filter>src\KKYUM</Filter>
+    </ClCompile>
+    <ClCompile Include="src\PCDSRVC\PCDSRVCBackend.cpp">
+      <Filter>src\PCDSRVC</Filter>
+    </ClCompile>
+    <ClCompile Include="src\PPA64\PPA64Backend.cpp">
+      <Filter>src\PPA64</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CorMem\CorMemBackend.cpp">
+      <Filter>src\CorMem</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CorMem\WinIo64Backend.cpp">
+      <Filter>src\CorMem</Filter>
     </ClCompile>
     <ClCompile Include="src\RTCore64\RTCore64Backend.cpp">
       <Filter>src\RTCore64</Filter>
