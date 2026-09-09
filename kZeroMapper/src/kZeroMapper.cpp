@@ -83,6 +83,25 @@ namespace kZeroMapper
 		g_LogCallback = callback;
 	}
 
+	static std::string g_ChangeVulnerableDriverFileName = "";
+
+	void SetVulnerableDriverFileName( const char* fileName )
+	{
+		if ( fileName && *fileName )
+			g_ChangeVulnerableDriverFileName = fileName;
+	}
+
+	const char* GetVulnerableDriverFileName( )
+	{
+		static 
+		std::string g_VulnerableDriverFileName = pstra( "VirtualDrv.sys" );
+
+		if ( !g_ChangeVulnerableDriverFileName.empty( ) )
+			g_VulnerableDriverFileName = g_ChangeVulnerableDriverFileName;
+		
+		return g_VulnerableDriverFileName.c_str( );
+	}
+
 	NTSTATUS GetLastStatus( )
 	{
 		return g_LastStatus;

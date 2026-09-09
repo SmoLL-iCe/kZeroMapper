@@ -3,6 +3,11 @@
 #include <string>
 #include <vector>
 
+namespace kZeroMapper
+{
+	const char* GetVulnerableDriverFileName( );
+}
+
 using PENUMOBJECTSCALLBACK = NTSTATUS( NTAPI* )( POBJECT_DIRECTORY_INFORMATION, PVOID );
 
 struct OBJSCANPARAM
@@ -443,12 +448,12 @@ bool BuildMapperDriverPathA( char* buffer, size_t count, const char* driverFileN
 
 bool BuildMapperDriverPathW( wchar_t* buffer, size_t count )
 {
-	return BuildMapperDriverPathW( buffer, count, pstrw( L"VirtualDrv.sys" ) );
+	return BuildMapperDriverPathW( buffer, count, std::wstring( kZeroMapper::GetVulnerableDriverFileName( ), kZeroMapper::GetVulnerableDriverFileName( ) + std::strlen( kZeroMapper::GetVulnerableDriverFileName( ) ) ).c_str( ) );
 }
 
 bool BuildMapperDriverPathA( char* buffer, size_t count )
 {
-	return BuildMapperDriverPathA( buffer, count, pstra( "VirtualDrv.sys" ) );
+	return BuildMapperDriverPathA( buffer, count, kZeroMapper::GetVulnerableDriverFileName( ) );
 }
 
 NTSTATUS DropLoadAndOpenMapperDriver( const char* backendName, const wchar_t* devicePath, const void* driverData, size_t driverSize, HANDLE* deviceHandle, uint32_t statusBase, const char* serviceName )
@@ -458,16 +463,24 @@ NTSTATUS DropLoadAndOpenMapperDriver( const char* backendName, const wchar_t* de
 
 	*deviceHandle = INVALID_HANDLE_VALUE;
 
-	std::string ansiServiceName = serviceName ? std::string( serviceName ) : std::string( pstra( "VirtualDrv" ) );
+	std::string ansiServiceName;
 	std::wstring wDriverFileNameSuffix;
 
 	if ( serviceName )
 	{
+		ansiServiceName = std::string( serviceName );
 		wDriverFileNameSuffix = std::wstring( serviceName, serviceName + std::strlen( serviceName ) ) + pstrw( L".sys" );
 	}
 	else
 	{
-		wDriverFileNameSuffix = pstrw( L"VirtualDrv.sys" );
+		const auto customName = kZeroMapper::GetVulnerableDriverFileName( );
+		ansiServiceName = std::string( customName );
+
+		// Strip a trailing ".sys" for the service name if present
+		if ( ansiServiceName.size( ) > 4 && _stricmp( ansiServiceName.c_str( ) + ansiServiceName.size( ) - 4, ".sys" ) == 0 )
+			ansiServiceName.resize( ansiServiceName.size( ) - 4 );
+
+		wDriverFileNameSuffix = std::wstring( customName, customName + std::strlen( customName ) );
 	}
 
 	wchar_t wDrvFileName[ MAX_PATH * 2 ]{};
@@ -561,8 +574,24 @@ void CloseMapperDevice( HANDLE* deviceHandle )
 
 NTSTATUS UnloadMapperDriver( const char* serviceName )
 {
-	std::string ansiServiceName = serviceName ? std::string( serviceName ) : std::string( pstra( "VirtualDrv" ) );
-	std::string ansiDriverSuffix = ansiServiceName + pstra( ".sys" );
+	std::string ansiServiceName;
+	std::string ansiDriverSuffix;
+
+	if ( serviceName )
+	{
+		ansiServiceName = std::string( serviceName );
+		ansiDriverSuffix = ansiServiceName + pstra( ".sys" );
+	}
+	else
+	{
+		ansiServiceName = std::string( kZeroMapper::GetVulnerableDriverFileName( ) );
+
+		// Strip a trailing ".sys" for the service name if present
+		if ( ansiServiceName.size( ) > 4 && _stricmp( ansiServiceName.c_str( ) + ansiServiceName.size( ) - 4, ".sys" ) == 0 )
+			ansiServiceName.resize( ansiServiceName.size( ) - 4 );
+
+		ansiDriverSuffix = ansiServiceName + pstra( ".sys" );
+	}
 
 	char drvFileName[ MAX_PATH ]{};
 

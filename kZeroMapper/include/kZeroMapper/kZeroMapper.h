@@ -29,6 +29,9 @@ namespace kZeroMapper {
 	using LogCallback = void(*)(const char* message);
 	void SetLogCallback(LogCallback callback);
 
+	void SetVulnerableDriverFileName(const char* fileName);
+	const char* GetVulnerableDriverFileName();
+
 	NTSTATUS MapDriver(void* pDrvData = nullptr, size_t szDataSize = 0, bool bClean = false);
 	NTSTATUS MapDriver(MapperProvider provider, void* pDrvData = nullptr, size_t szDataSize = 0, KernelAllocationMode allocationMode = KernelAllocationMode::Pool, bool bClean = false);
 	bool IsProviderSupported(MapperProvider provider);
