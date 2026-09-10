@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -58,13 +58,14 @@
       <AdditionalIncludeDirectories>include;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4390;4201;4214;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions);_HAS_STATIC_RTTI=0</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'!='Debug'">
@@ -74,7 +75,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <PreprocessorDefinitions>NDEBUG;_LIB;WITH_LOGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_LIB;WITH_LOGS;%(PreprocessorDefinitions);_HAS_STATIC_RTTI=0</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -125,7 +126,6 @@
     <ClCompile Include="src\KDMapper\KDMapperBackend.cpp" />
     <ClCompile Include="src\kZeroMapper.cpp" />
     <ClCompile Include="src\KKYUM\KKYUMBackend.cpp" />
-
     <ClCompile Include="src\CorMem\CorMemBackend.cpp" />
     <ClCompile Include="src\WinIo64\WinIo64Backend.cpp" />
     <ClCompile Include="src\RTCore64\RTCore64Backend.cpp" />

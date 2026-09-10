@@ -404,9 +404,52 @@ bool StopDriverService( const wchar_t* serviceName, bool bDelete )
 	return bDelete ? ( isStopped && deleted ) : isStopped;
 }
 
+static void ResolveDriverNames( const char* backendName, const char* serviceName, std::string& outServiceName, std::string& outDriverFileName )
+{
+	std::string name;
+
+	if ( serviceName && *serviceName )
+	{
+		name = serviceName;
+	}
+	else
+	{
+		const auto customName = kZeroMapper::GetVulnerableDriverFileName( );
+		if ( customName && *customName )
+			name = customName;
+	}
+
+	// Strip directory path if present
+	const auto lastSlash = name.find_last_of( "\\/" );
+	if ( lastSlash != std::string::npos )
+		name = name.substr( lastSlash + 1 );
+
+	// Strip whitespace
+	while ( !name.empty( ) && ( name.front( ) == ' ' || name.front( ) == '\t' ) )
+		name.erase( name.begin( ) );
+	while ( !name.empty( ) && ( name.back( ) == ' ' || name.back( ) == '\t' || name.back( ) == '\r' || name.back( ) == '\n' ) )
+		name.pop_back( );
+
+	// Strip trailing ".sys" for service name
+	if ( name.size( ) > 4 && _stricmp( name.c_str( ) + name.size( ) - 4, ".sys" ) == 0 )
+		name.resize( name.size( ) - 4 );
+
+	// If name became empty, fallback to backendName or "VirtualDrv"
+	if ( name.empty( ) )
+	{
+		if ( backendName && *backendName )
+			name = backendName;
+		else
+			name = "VirtualDrv";
+	}
+
+	outServiceName = name;
+	outDriverFileName = name + pstra( ".sys" );
+}
+
 bool BuildMapperDriverPathW( wchar_t* buffer, size_t count, const wchar_t* driverFileName )
 {
-	if ( !buffer || !count || !driverFileName )
+	if ( !buffer || !count || !driverFileName || !*driverFileName )
 		return false;
 
 	buffer[ 0 ] = 0;
@@ -427,7 +470,7 @@ bool BuildMapperDriverPathW( wchar_t* buffer, size_t count, const wchar_t* drive
 
 bool BuildMapperDriverPathA( char* buffer, size_t count, const char* driverFileName )
 {
-	if ( !buffer || !count || !driverFileName )
+	if ( !buffer || !count || !driverFileName || !*driverFileName )
 		return false;
 
 	buffer[ 0 ] = 0;
@@ -448,12 +491,108 @@ bool BuildMapperDriverPathA( char* buffer, size_t count, const char* driverFileN
 
 bool BuildMapperDriverPathW( wchar_t* buffer, size_t count )
 {
-	return BuildMapperDriverPathW( buffer, count, std::wstring( kZeroMapper::GetVulnerableDriverFileName( ), kZeroMapper::GetVulnerableDriverFileName( ) + std::strlen( kZeroMapper::GetVulnerableDriverFileName( ) ) ).c_str( ) );
+	std::string svcName, drvFileName;
+	ResolveDriverNames( nullptr, nullptr, svcName, drvFileName );
+	const std::wstring wDrvFileName( drvFileName.begin( ), drvFileName.end( ) );
+	return BuildMapperDriverPathW( buffer, count, wDrvFileName.c_str( ) );
 }
 
 bool BuildMapperDriverPathA( char* buffer, size_t count )
 {
-	return BuildMapperDriverPathA( buffer, count, kZeroMapper::GetVulnerableDriverFileName( ) );
+	std::string svcName, drvFileName;
+	ResolveDriverNames( nullptr, nullptr, svcName, drvFileName );
+	return BuildMapperDriverPathA( buffer, count, drvFileName.c_str( ) );
+}
+
+static bool WriteDriverToDisk( const wchar_t* filePath, const void* buffer, size_t size, DWORD* outWritten, DWORD* outGle )
+{
+	if ( outWritten )
+		*outWritten = 0;
+	if ( outGle )
+		*outGle = ERROR_SUCCESS;
+
+	if ( !filePath || !*filePath || !buffer || !size )
+	{
+		if ( outGle )
+			*outGle = ERROR_INVALID_PARAMETER;
+		return false;
+	}
+
+	const auto pathLen = wcslen( filePath );
+	if ( filePath[ pathLen - 1 ] == L'\\' || filePath[ pathLen - 1 ] == L'/' )
+	{
+		if ( outGle )
+			*outGle = ERROR_BAD_PATHNAME;
+		return false;
+	}
+
+	// Remove read-only or hidden attributes from previous runs
+	SetFileAttributesW( filePath, FILE_ATTRIBUTE_NORMAL );
+
+	HANDLE hFile = CreateFileW(
+		filePath,
+		GENERIC_WRITE,
+		FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+		nullptr,
+		CREATE_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL,
+		nullptr
+	);
+
+	if ( hFile == INVALID_HANDLE_VALUE )
+	{
+		const DWORD initialGle = GetLastError( );
+		DeleteFileW( filePath );
+		Sleep( 50 );
+
+		hFile = CreateFileW(
+			filePath,
+			GENERIC_WRITE,
+			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+			nullptr,
+			CREATE_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL,
+			nullptr
+		);
+
+		if ( hFile == INVALID_HANDLE_VALUE )
+		{
+			if ( outGle )
+				*outGle = ( GetLastError( ) != ERROR_SUCCESS ) ? GetLastError( ) : initialGle;
+			return false;
+		}
+	}
+
+	SetFilePointer( hFile, 0, nullptr, FILE_BEGIN );
+
+	DWORD totalWritten = 0;
+	const auto pBytes = static_cast<const uint8_t*>( buffer );
+
+	while ( totalWritten < size )
+	{
+		const auto toWrite = static_cast<DWORD>( std::min<size_t>( size - totalWritten, 0x100000 ) );
+		DWORD chunkWritten = 0;
+
+		if ( !WriteFile( hFile, pBytes + totalWritten, toWrite, &chunkWritten, nullptr ) || chunkWritten == 0 )
+		{
+			if ( outGle )
+				*outGle = GetLastError( );
+			if ( outWritten )
+				*outWritten = totalWritten;
+			CloseHandle( hFile );
+			return false;
+		}
+
+		totalWritten += chunkWritten;
+	}
+
+	FlushFileBuffers( hFile );
+	CloseHandle( hFile );
+
+	if ( outWritten )
+		*outWritten = totalWritten;
+
+	return totalWritten == size;
 }
 
 NTSTATUS DropLoadAndOpenMapperDriver( const char* backendName, const wchar_t* devicePath, const void* driverData, size_t driverSize, HANDLE* deviceHandle, uint32_t statusBase, const char* serviceName )
@@ -464,48 +603,33 @@ NTSTATUS DropLoadAndOpenMapperDriver( const char* backendName, const wchar_t* de
 	*deviceHandle = INVALID_HANDLE_VALUE;
 
 	std::string ansiServiceName;
-	std::wstring wDriverFileNameSuffix;
+	std::string ansiDriverFileName;
+	ResolveDriverNames( backendName, serviceName, ansiServiceName, ansiDriverFileName );
 
-	if ( serviceName )
-	{
-		ansiServiceName = std::string( serviceName );
-		wDriverFileNameSuffix = std::wstring( serviceName, serviceName + std::strlen( serviceName ) ) + pstrw( L".sys" );
-	}
-	else
-	{
-		const auto customName = kZeroMapper::GetVulnerableDriverFileName( );
-		ansiServiceName = std::string( customName );
-
-		// Strip a trailing ".sys" for the service name if present
-		if ( ansiServiceName.size( ) > 4 && _stricmp( ansiServiceName.c_str( ) + ansiServiceName.size( ) - 4, ".sys" ) == 0 )
-			ansiServiceName.resize( ansiServiceName.size( ) - 4 );
-
-		wDriverFileNameSuffix = std::wstring( customName, customName + std::strlen( customName ) );
-	}
+	const std::wstring wDriverFileNameSuffix( ansiDriverFileName.begin( ), ansiDriverFileName.end( ) );
 
 	wchar_t wDrvFileName[ MAX_PATH * 2 ]{};
 
 	if ( !BuildMapperDriverPathW( wDrvFileName, _countof( wDrvFileName ), wDriverFileNameSuffix.c_str( ) ) )
 	{
-		LOG_SEC( "[-] - [%s] Ldr: GetSystemDirectoryW failed", backendName );
+		LOG_SEC( "[-] - [%s] Ldr: BuildMapperDriverPathW failed for file=%ls", backendName, wDriverFileNameSuffix.c_str( ) );
 		return statusBase;
 	}
 
-	const auto written = WriteBufferToFile( wDrvFileName, const_cast<void*>( driverData ), s_cast<int>( driverSize ), FALSE, FALSE );
+	DWORD written = 0;
+	DWORD gle = 0;
 
-	if ( written != driverSize )
+	if ( !WriteDriverToDisk( wDrvFileName, driverData, driverSize, &written, &gle ) )
 	{
-		LOG_SEC( "[-] - [%s] Ldr: Error writing driver on disk written=0x%X expected=0x%llx", backendName, written, driverSize );
+		LOG_SEC( "[-] - [%s] Ldr: Error writing driver on disk written=0x%X expected=0x%llx gle=%lu file=%ls", backendName, written, driverSize, gle, wDrvFileName );
 		return statusBase + 1;
 	}
 
 	char drvFileName[ MAX_PATH ]{};
 
-	std::string ansiDriverSuffix = ansiServiceName + pstra( ".sys" );
-
-	if ( !BuildMapperDriverPathA( drvFileName, _countof( drvFileName ), ansiDriverSuffix.c_str( ) ) )
+	if ( !BuildMapperDriverPathA( drvFileName, _countof( drvFileName ), ansiDriverFileName.c_str( ) ) )
 	{
-		LOG_SEC( "[-] - [%s] Ldr: GetSystemDirectoryA failed", backendName );
+		LOG_SEC( "[-] - [%s] Ldr: BuildMapperDriverPathA failed for file=%s", backendName, ansiDriverFileName.c_str( ) );
 		return statusBase + 2;
 	}
 
@@ -575,27 +699,12 @@ void CloseMapperDevice( HANDLE* deviceHandle )
 NTSTATUS UnloadMapperDriver( const char* serviceName )
 {
 	std::string ansiServiceName;
-	std::string ansiDriverSuffix;
-
-	if ( serviceName )
-	{
-		ansiServiceName = std::string( serviceName );
-		ansiDriverSuffix = ansiServiceName + pstra( ".sys" );
-	}
-	else
-	{
-		ansiServiceName = std::string( kZeroMapper::GetVulnerableDriverFileName( ) );
-
-		// Strip a trailing ".sys" for the service name if present
-		if ( ansiServiceName.size( ) > 4 && _stricmp( ansiServiceName.c_str( ) + ansiServiceName.size( ) - 4, ".sys" ) == 0 )
-			ansiServiceName.resize( ansiServiceName.size( ) - 4 );
-
-		ansiDriverSuffix = ansiServiceName + pstra( ".sys" );
-	}
+	std::string ansiDriverFileName;
+	ResolveDriverNames( nullptr, serviceName, ansiServiceName, ansiDriverFileName );
 
 	char drvFileName[ MAX_PATH ]{};
 
-	if ( BuildMapperDriverPathA( drvFileName, _countof( drvFileName ), ansiDriverSuffix.c_str( ) ) )
+	if ( BuildMapperDriverPathA( drvFileName, _countof( drvFileName ), ansiDriverFileName.c_str( ) ) )
 	{
 		return LoadAndUnload( ansiServiceName.c_str( ), drvFileName, false, false );
 	}

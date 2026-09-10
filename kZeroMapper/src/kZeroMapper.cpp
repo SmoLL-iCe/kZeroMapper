@@ -88,18 +88,33 @@ namespace kZeroMapper
 	void SetVulnerableDriverFileName( const char* fileName )
 	{
 		if ( fileName && *fileName )
-			g_ChangeVulnerableDriverFileName = fileName;
+		{
+			std::string name( fileName );
+			const auto lastSlash = name.find_last_of( "\\/" );
+			if ( lastSlash != std::string::npos )
+				name = name.substr( lastSlash + 1 );
+
+			while ( !name.empty( ) && ( name.front( ) == ' ' || name.front( ) == '\t' ) )
+				name.erase( name.begin( ) );
+			while ( !name.empty( ) && ( name.back( ) == ' ' || name.back( ) == '\t' || name.back( ) == '\r' || name.back( ) == '\n' ) )
+				name.pop_back( );
+
+			if ( !name.empty( ) )
+			{
+				if ( name.size( ) < 4 || _stricmp( name.c_str( ) + name.size( ) - 4, ".sys" ) != 0 )
+					name += ".sys";
+
+				g_ChangeVulnerableDriverFileName = name;
+			}
+		}
 	}
 
 	const char* GetVulnerableDriverFileName( )
 	{
-		static 
-		std::string g_VulnerableDriverFileName = pstra( "VirtualDrv.sys" );
-
 		if ( !g_ChangeVulnerableDriverFileName.empty( ) )
-			g_VulnerableDriverFileName = g_ChangeVulnerableDriverFileName;
-		
-		return g_VulnerableDriverFileName.c_str( );
+			return g_ChangeVulnerableDriverFileName.c_str( );
+
+		return "VirtualDrv.sys";
 	}
 
 	NTSTATUS GetLastStatus( )
